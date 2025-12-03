@@ -87,7 +87,7 @@ python -m check_cloud_drives.main
 
 ## Configuration
 
-The application stores all configuration in `~/.check_cloud_drives_config.json`. This file includes:
+The application stores all configuration in `CheckCloudDrivesConfig.toml` in the project root directory. This file includes:
 - List of monitored drives
 - Window position and size
 - Stay on top preference

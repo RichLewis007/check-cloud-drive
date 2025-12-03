@@ -1,6 +1,9 @@
 # local-only files
 local/
 
+# GitHub Pages build output
+_site/
+
 # Configuration file with private cloud drive info
 CheckCloudDrivesConfig.toml
 
