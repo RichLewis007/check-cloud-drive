@@ -1,0 +1,12 @@
+# Dependencies
+.venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Local files
+local/

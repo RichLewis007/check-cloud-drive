@@ -1,22 +1,42 @@
 """Main application window."""
 
-import sys
-import subprocess
 import platform
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
-from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QScrollArea,
-    QDialog, QSizePolicy, QCheckBox, QSpinBox, QGroupBox
-)
-from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent
-from PySide6.QtCore import Qt, QTimer, QPoint, QMimeData, QRect
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
 
-from ..models import DriveConfig, DriveStatus
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QDragEnterEvent,
+    QDropEvent,
+    QFont,
+    QIcon,
+    QPainter,
+    QPixmap,
+)
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget,
+)
+
 from ..config import ConfigManager
+from ..models import DriveConfig, DriveStatus
 from ..rclone import RcloneWorker
 from .card import DriveCard
 from .dialogs import SetupDialog
@@ -24,31 +44,31 @@ from .dialogs import SetupDialog
 
 class StackedIconButton(QPushButton):
     """Button with stacked icons - cloud icon with plus icon on top."""
-    
+
     def __init__(self, text="", parent=None):
         super().__init__(text, parent)
         # Nerd Font Unicode codepoints (Private Use Area)
         # nf-md-cloud: U+F0C2, nf-fa-plus: U+F067
         self.cloud_icon = "\uf0c2"  # nf-md-cloud
         self.plus_icon = "\uf067"  # nf-fa-plus
-        
+
     def paintEvent(self, event):
         """Custom paint to draw stacked icons."""
         super().paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        
+
         # Get button rect
         rect = self.rect()
         center_x = rect.center().x()
         center_y = rect.center().y()
-        
+
         # Draw cloud icon (larger, base, inverted/white)
         font = QFont("AtkynsonMono Nerd Font Propo", 22)  # Larger size
         painter.setFont(font)
         painter.setPen(QColor("#ffffff"))  # Inverted (white)
         painter.drawText(rect, Qt.AlignCenter, self.cloud_icon)
-        
+
         # Draw plus icon (smaller, blue color matching button, on top)
         font_small = QFont("AtkynsonMono Nerd Font Propo", 14)  # Larger size
         painter.setFont(font_small)
@@ -60,59 +80,59 @@ class StackedIconButton(QPushButton):
 
 class DropTargetWidget(QWidget):
     """Widget that accepts drops for card reordering."""
-    
+
     def __init__(self, parent=None, reorder_callback=None):
         super().__init__(parent)
         self.reorder_callback = reorder_callback
         self.setAcceptDrops(True)
-    
+
     def dragEnterEvent(self, event: QDragEnterEvent):
         """Handle drag enter event."""
         if event.mimeData().hasText():
             event.acceptProposedAction()
-    
+
     def dropEvent(self, event: QDropEvent):
         """Handle drop event - find the card under the drop position."""
         if not event.mimeData().hasText():
             return
-        
+
         dragged_remote = event.mimeData().text()
         drop_pos = event.position().toPoint()
-        
+
         # Find which card (if any) is under the drop position
         target_card = None
         for child in self.findChildren(DriveCard):
             if child.geometry().contains(drop_pos):
                 target_card = child
                 break
-        
+
         if target_card and self.reorder_callback:
             target_remote = target_card.drive_config.remote_name
             if dragged_remote != target_remote:
                 self.reorder_callback(dragged_remote, target_remote)
-        
+
         event.acceptProposedAction()
 
 
 class MainWindow(QMainWindow):
     """Main application window."""
-    
+
     def __init__(self):
         super().__init__()
         # Config file in project root directory
         project_root = Path(__file__).parent.parent.parent.parent
         config_path = project_root / "CheckCloudDrivesConfig.toml"
         self.config_manager = ConfigManager(config_path)
-        self.drive_cards: Dict[str, DriveCard] = {}
-        self.workers: List[RcloneWorker] = []
+        self.drive_cards: dict[str, DriveCard] = {}
+        self.workers: list[RcloneWorker] = []
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_all_drives)
-        
+
         self._setup_ui()
         self._setup_tray()
         self._load_drives()
         self._restore_geometry()
-        
+
         # Auto-refresh
         interval = self.config_manager.config.get("auto_refresh_interval", 300)
         if interval > 0:
@@ -124,14 +144,14 @@ class MainWindow(QMainWindow):
         # Set optimal width for drive cards (380px provides comfortable padding)
         self.setMinimumSize(380, 300)
         self.resize(380, 600)
-        
+
         # Central widget
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
         layout.setSpacing(8)
         layout.setContentsMargins(12, 12, 12, 12)
-        
+
         # Title (draggable area)
         title = QLabel("Cloud Drive Status")
         title.setStyleSheet("""
@@ -149,7 +169,7 @@ class MainWindow(QMainWindow):
         title.mouseReleaseEvent = lambda e: self._title_mouse_release(e)
         self.title_label = title
         layout.addWidget(title)
-        
+
         # Scroll area for drive cards
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -172,24 +192,24 @@ class MainWindow(QMainWindow):
                 background-color: #95a5a6;
             }
         """)
-        
+
         scroll_widget = DropTargetWidget(self, self.reorder_cards)
         scroll_layout = QVBoxLayout(scroll_widget)
         scroll_layout.setSpacing(4)
         scroll_layout.addStretch()
-        
+
         self.cards_container = scroll_widget
         self.cards_layout = scroll_layout
-        
+
         scroll.setWidget(scroll_widget)
-        
+
         # Settings page (initially hidden)
         self.settings_page = self._create_settings_page()
         self.settings_page.hide()
-        
+
         # Store reference to scroll area
         self.scroll_area = scroll
-        
+
         # Stack widgets to switch between cards and settings
         self.content_stack = QWidget()
         content_stack_layout = QVBoxLayout(self.content_stack)
@@ -197,12 +217,12 @@ class MainWindow(QMainWindow):
         content_stack_layout.setSpacing(0)
         content_stack_layout.addWidget(scroll)
         content_stack_layout.addWidget(self.settings_page)
-        
+
         layout.addWidget(self.content_stack)
-        
+
         # Control buttons
         controls = QHBoxLayout()
-        
+
         # Refresh All button with nf-md-cloud_refresh icon
         # nf-md-cloud_refresh: U+F052A (codepoint f052a from nerdfonts.com)
         # Using the actual character provided by user: 󰔪
@@ -221,7 +241,7 @@ class MainWindow(QMainWindow):
         refresh_btn.setToolTip("Refresh All")
         refresh_btn.clicked.connect(self.refresh_all_drives)
         controls.addWidget(refresh_btn)
-        
+
         # Add Drive button with stacked icons (cloud + plus)
         add_btn = StackedIconButton("")
         add_btn.setStyleSheet("""
@@ -237,7 +257,7 @@ class MainWindow(QMainWindow):
         add_btn.setToolTip("Add Drive")
         add_btn.clicked.connect(self._add_drive)
         controls.addWidget(add_btn)
-        
+
         settings_btn = QPushButton("\uf013")  # nf-fa-cog (gear icon) - same as cards
         settings_btn.setStyleSheet("""
             QPushButton {
@@ -253,9 +273,9 @@ class MainWindow(QMainWindow):
         settings_btn.setToolTip("Settings")
         settings_btn.clicked.connect(self._show_settings)
         controls.addWidget(settings_btn)
-        
+
         controls.addStretch()
-        
+
         # Hide button (blue)
         hide_btn = QPushButton("Hide")
         hide_btn.setStyleSheet("""
@@ -278,7 +298,7 @@ class MainWindow(QMainWindow):
         """)
         hide_btn.clicked.connect(self.hide)
         controls.addWidget(hide_btn, alignment=Qt.AlignVCenter)
-        
+
         # Exit button (red)
         exit_btn = QPushButton("Exit")
         exit_btn.setStyleSheet("""
@@ -301,9 +321,9 @@ class MainWindow(QMainWindow):
         """)
         exit_btn.clicked.connect(QApplication.quit)
         controls.addWidget(exit_btn, alignment=Qt.AlignVCenter)
-        
+
         layout.addLayout(controls)
-        
+
         # Apply light theme with AtkynsonMono Nerd Font Propo
         self.setStyleSheet("""
             QMainWindow {
@@ -338,7 +358,7 @@ class MainWindow(QMainWindow):
                 font-family: "AtkynsonMono Nerd Font Propo", monospace;
             }
         """)
-        
+
         # Track mouse for edge snapping
         self.edge_snap_threshold = 20  # pixels
         self.is_dragging = False
@@ -348,14 +368,12 @@ class MainWindow(QMainWindow):
         """Set up system tray icon."""
         if not QSystemTrayIcon.isSystemTrayAvailable():
             QMessageBox.critical(
-                self,
-                "System Tray",
-                "System tray is not available on this system."
+                self, "System Tray", "System tray is not available on this system."
             )
             return
-        
+
         self.tray_icon = QSystemTrayIcon(self)
-        
+
         # Create a simple icon (placeholder - you can replace with actual icon)
         pixmap = QPixmap(32, 32)
         pixmap.fill(QColor(100, 150, 255))
@@ -364,33 +382,33 @@ class MainWindow(QMainWindow):
         painter.setFont(QFont("Arial", 20))
         painter.drawText(pixmap.rect(), Qt.AlignCenter, "☁")
         painter.end()
-        
+
         self.tray_icon.setIcon(QIcon(pixmap))
         self.tray_icon.setToolTip("Check Cloud Drives")
-        
+
         # Tray menu
         tray_menu = QMenu(self)
-        
+
         show_action = QAction("Show", self)
         show_action.triggered.connect(self.show)
         tray_menu.addAction(show_action)
-        
+
         hide_action = QAction("Hide", self)
         hide_action.triggered.connect(self.hide)
         tray_menu.addAction(hide_action)
-        
+
         stay_on_top_action = QAction("Stay on Top", self)
         stay_on_top_action.setCheckable(True)
         stay_on_top_action.setChecked(self.config_manager.get_stay_on_top())
         stay_on_top_action.triggered.connect(self._toggle_stay_on_top)
         tray_menu.addAction(stay_on_top_action)
-        
+
         tray_menu.addSeparator()
-        
+
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(QApplication.quit)
         tray_menu.addAction(quit_action)
-        
+
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self._tray_activated)
         self.tray_icon.show()
@@ -424,22 +442,22 @@ class MainWindow(QMainWindow):
             # Load drives in saved order
             saved_order = self.config_manager.get_drive_order()
             drives_dict = {d.remote_name: d for d in drives if d.enabled}
-            
+
             # Add drives in saved order, then any remaining drives
             ordered_drives = []
             for remote_name in saved_order:
                 if remote_name in drives_dict:
                     ordered_drives.append(drives_dict[remote_name])
                     del drives_dict[remote_name]
-            
+
             # Add any remaining drives that weren't in saved order
             for drive_config in drives_dict.values():
                 ordered_drives.append(drive_config)
-            
+
             # Add cards in order
             for drive_config in ordered_drives:
                 self._add_drive_card(drive_config)
-            
+
             # Auto-refresh on load
             QTimer.singleShot(1000, self.refresh_all_drives)
 
@@ -455,42 +473,33 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(1000, self.refresh_all_drives)
         else:
             QMessageBox.information(
-                self,
-                "No Remotes Found",
-                "No rclone remotes found. Please configure rclone first."
+                self, "No Remotes Found", "No rclone remotes found. Please configure rclone first."
             )
 
-    def _get_available_remotes(self) -> List[str]:
+    def _get_available_remotes(self) -> list[str]:
         """Get list of available rclone remotes."""
         try:
             # Check if rclone is available
-            subprocess.run(
-                ["rclone", "version"],
-                capture_output=True,
-                timeout=5
-            )
+            subprocess.run(["rclone", "version"], capture_output=True, timeout=5)
         except (FileNotFoundError, subprocess.TimeoutExpired):
             QMessageBox.critical(
                 self,
                 "rclone Not Found",
                 "rclone is not installed or not in PATH.\n\n"
-                "Please install rclone from https://rclone.org/install/"
+                "Please install rclone from https://rclone.org/install/",
             )
             return []
         except Exception:
             pass  # Continue anyway
-        
+
         try:
             result = subprocess.run(
-                ["rclone", "listremotes"],
-                capture_output=True,
-                text=True,
-                timeout=10
+                ["rclone", "listremotes"], capture_output=True, text=True, timeout=10
             )
             if result.returncode == 0:
                 remotes = [
-                    line.strip().rstrip(':')
-                    for line in result.stdout.strip().split('\n')
+                    line.strip().rstrip(":")
+                    for line in result.stdout.strip().split("\n")
                     if line.strip()
                 ]
                 return remotes
@@ -513,11 +522,11 @@ class MainWindow(QMainWindow):
         """Add a drive card to the UI."""
         if drive_config.remote_name in self.drive_cards:
             return  # Already exists
-        
+
         card = DriveCard(drive_config, self.cards_container)
         card.setAcceptDrops(True)
         self.drive_cards[drive_config.remote_name] = card
-        
+
         # Insert before stretch
         count = self.cards_layout.count()
         self.cards_layout.insertWidget(count - 1, card)
@@ -529,7 +538,7 @@ class MainWindow(QMainWindow):
             drives.append(card.drive_config)
         self.config_manager.set_drives(drives)
         self._save_drive_order()
-    
+
     def _save_drive_order(self):
         """Save the current order of drive cards."""
         order = []
@@ -541,28 +550,28 @@ class MainWindow(QMainWindow):
                 if isinstance(card, DriveCard):
                     order.append(card.drive_config.remote_name)
         self.config_manager.set_drive_order(order)
-    
+
     def reorder_cards(self, dragged_remote: str, target_remote: str):
         """Reorder cards when one is dragged onto another."""
         if dragged_remote == target_remote:
             return
-        
+
         if dragged_remote not in self.drive_cards or target_remote not in self.drive_cards:
             return
-        
+
         dragged_card = self.drive_cards[dragged_remote]
         target_card = self.drive_cards[target_remote]
-        
+
         # Get current positions (these indices account for the stretch at index 0)
         dragged_index = self.cards_layout.indexOf(dragged_card)
         target_index = self.cards_layout.indexOf(target_card)
-        
+
         if dragged_index == -1 or target_index == -1:
             return
-        
+
         # Remove dragged card first
         self.cards_layout.removeWidget(dragged_card)
-        
+
         # Calculate insert position
         # After removing the dragged card, indices shift:
         # - If moving down (dragged_index < target_index), target_index decreases by 1
@@ -574,13 +583,13 @@ class MainWindow(QMainWindow):
         else:
             # Moving up - insert before target (target_index unchanged after removal)
             insert_index = target_index
-        
+
         # Reinsert at the correct position
         self.cards_layout.insertWidget(insert_index, dragged_card)
-        
+
         # Force layout update to ensure visual change
         self.cards_layout.update()
-        
+
         # Save new order
         self._save_drive_order()
 
@@ -594,27 +603,23 @@ class MainWindow(QMainWindow):
         remote_name = card.drive_config.remote_name
         if not remote_name:
             return
-        
+
         card.set_updating(True)
-        
+
         worker = RcloneWorker(["rclone", "about", remote_name + ":"], remote_name)
-        worker.finished.connect(
-            lambda rn, result: self._on_drive_update(rn, result, None)
-        )
-        worker.error.connect(
-            lambda rn, error: self._on_drive_update(rn, None, error)
-        )
+        worker.finished.connect(lambda rn, result: self._on_drive_update(rn, result, None))
+        worker.error.connect(lambda rn, error: self._on_drive_update(rn, None, error))
         worker.start()
         self.workers.append(worker)
 
-    def _on_drive_update(self, remote_name: str, result: Optional[dict], error: Optional[str]):
+    def _on_drive_update(self, remote_name: str, result: dict | None, error: str | None):
         """Handle drive update result."""
         if remote_name not in self.drive_cards:
             return
-        
+
         card = self.drive_cards[remote_name]
         card.set_updating(False)
-        
+
         if error:
             status = DriveStatus(remote_name=remote_name, error=error)
         else:
@@ -626,9 +631,9 @@ class MainWindow(QMainWindow):
                 trash=result.get("trash", "Unknown"),
                 other=result.get("other", "Unknown"),
                 objects=result.get("objects", "Unknown"),
-                last_updated=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                last_updated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
-        
+
         card.update_status(status)
         self._save_drives()
 
@@ -646,7 +651,7 @@ class MainWindow(QMainWindow):
         settings_layout = QVBoxLayout(settings_widget)
         settings_layout.setSpacing(12)
         settings_layout.setContentsMargins(20, 20, 20, 12)
-        
+
         # Title
         title = QLabel("App Settings")
         title.setStyleSheet("""
@@ -657,7 +662,7 @@ class MainWindow(QMainWindow):
             padding: 8px 0px;
         """)
         settings_layout.addWidget(title)
-        
+
         # Auto-refresh settings
         refresh_group = QGroupBox("Auto-Refresh")
         refresh_group.setStyleSheet("""
@@ -678,7 +683,7 @@ class MainWindow(QMainWindow):
             }
         """)
         refresh_layout = QVBoxLayout(refresh_group)
-        
+
         self.auto_refresh_enabled = QCheckBox("Enable auto-refresh")
         self.auto_refresh_enabled.setStyleSheet("""
             QCheckBox {
@@ -688,12 +693,14 @@ class MainWindow(QMainWindow):
             }
         """)
         refresh_layout.addWidget(self.auto_refresh_enabled)
-        
+
         interval_layout = QHBoxLayout()
         interval_label = QLabel("Refresh interval (minutes):")
-        interval_label.setStyleSheet("font-family: 'AtkynsonMono Nerd Font Propo', monospace; font-size: 12px; color: #2c3e50;")
+        interval_label.setStyleSheet(
+            "font-family: 'AtkynsonMono Nerd Font Propo', monospace; font-size: 12px; color: #2c3e50;"
+        )
         interval_layout.addWidget(interval_label)
-        
+
         self.refresh_interval_spin = QSpinBox()
         self.refresh_interval_spin.setMinimum(1)
         self.refresh_interval_spin.setMaximum(1440)  # Max 24 hours
@@ -725,9 +732,9 @@ class MainWindow(QMainWindow):
         interval_layout.addWidget(self.refresh_interval_spin)
         interval_layout.addStretch()
         refresh_layout.addLayout(interval_layout)
-        
+
         settings_layout.addWidget(refresh_group)
-        
+
         # Window settings
         window_group = QGroupBox("Window Behavior")
         window_group.setStyleSheet("""
@@ -748,7 +755,7 @@ class MainWindow(QMainWindow):
             }
         """)
         window_layout = QVBoxLayout(window_group)
-        
+
         self.stay_on_top_check = QCheckBox("Keep window on top")
         self.stay_on_top_check.setStyleSheet("""
             QCheckBox {
@@ -758,7 +765,7 @@ class MainWindow(QMainWindow):
             }
         """)
         window_layout.addWidget(self.stay_on_top_check)
-        
+
         self.run_at_startup_check = QCheckBox("Run at system startup")
         self.run_at_startup_check.setStyleSheet("""
             QCheckBox {
@@ -768,9 +775,9 @@ class MainWindow(QMainWindow):
             }
         """)
         window_layout.addWidget(self.run_at_startup_check)
-        
+
         settings_layout.addWidget(window_group)
-        
+
         # Config file path
         config_path_label = QLabel(f"Config file: {self.config_manager.config_path}")
         config_path_label.setStyleSheet("""
@@ -785,13 +792,13 @@ class MainWindow(QMainWindow):
         """)
         config_path_label.setWordWrap(True)
         settings_layout.addWidget(config_path_label)
-        
+
         settings_layout.addStretch()
-        
+
         # Save and Cancel buttons (centered)
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
+
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setStyleSheet("""
             QPushButton {
@@ -813,7 +820,7 @@ class MainWindow(QMainWindow):
         """)
         cancel_btn.clicked.connect(self._cancel_settings)
         button_layout.addWidget(cancel_btn)
-        
+
         save_btn = QPushButton("Save")
         save_btn.setStyleSheet("""
             QPushButton {
@@ -836,32 +843,34 @@ class MainWindow(QMainWindow):
         save_btn.clicked.connect(self._save_settings)
         button_layout.addWidget(save_btn)
         button_layout.addStretch()
-        
+
         settings_layout.addLayout(button_layout)
-        
+
         return settings_widget
-    
+
     def _show_settings(self):
         """Show settings page."""
         # Load current settings
         auto_refresh_interval = self.config_manager.config.get("auto_refresh_interval", 300)
         stay_on_top = self.config_manager.config.get("stay_on_top", False)
         run_at_startup = self.config_manager.config.get("run_at_startup", False)
-        
+
         self.auto_refresh_enabled.setChecked(auto_refresh_interval > 0)
-        self.refresh_interval_spin.setValue(auto_refresh_interval // 60)  # Convert seconds to minutes
+        self.refresh_interval_spin.setValue(
+            auto_refresh_interval // 60
+        )  # Convert seconds to minutes
         self.stay_on_top_check.setChecked(stay_on_top)
         self.run_at_startup_check.setChecked(run_at_startup)
-        
+
         # Show settings page, hide cards
         self.settings_page.show()
         self.scroll_area.hide()
-    
+
     def _cancel_settings(self):
         """Cancel settings changes and return to cards view."""
         self.settings_page.hide()
         self.scroll_area.show()
-    
+
     def _save_settings(self):
         """Save settings and return to cards view."""
         # Save auto-refresh settings
@@ -874,47 +883,47 @@ class MainWindow(QMainWindow):
         else:
             self.config_manager.config["auto_refresh_interval"] = 0
             self.refresh_timer.stop()
-        
+
         # Save stay on top setting
         stay_on_top = self.stay_on_top_check.isChecked()
         self.config_manager.config["stay_on_top"] = stay_on_top
         self.config_manager.save_config()
-        
+
         # Apply stay on top
         if stay_on_top:
             self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
         else:
             self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
         self.show()  # Required to apply window flag changes
-        
+
         # Save and apply run at startup setting
         run_at_startup = self.run_at_startup_check.isChecked()
         self.config_manager.config["run_at_startup"] = run_at_startup
         self.config_manager.save_config()
         self._set_run_at_startup(run_at_startup)
-        
+
         # Return to cards view
         self.settings_page.hide()
         self.scroll_area.show()
-    
+
     def _set_run_at_startup(self, enable: bool):
         """Enable or disable running at system startup (macOS Launch Agent)."""
         if platform.system() != "Darwin":  # macOS only
             return
-        
+
         try:
             launch_agents_dir = Path.home() / "Library" / "LaunchAgents"
             launch_agents_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Use a unique identifier for the plist file
             plist_name = "com.checkclouddrives.plist"
             plist_path = launch_agents_dir / plist_name
-            
+
             if enable:
                 # Get the path to the run.sh script
                 project_root = Path(__file__).parent.parent.parent.parent
                 script_path = project_root / "run.sh"
-                
+
                 if script_path.exists():
                     # Use the run.sh script
                     script_path = script_path.resolve()
@@ -963,9 +972,9 @@ class MainWindow(QMainWindow):
 </dict>
 </plist>
 """
-                with open(plist_path, 'w') as f:
+                with open(plist_path, "w") as f:
                     f.write(plist_content)
-                
+
                 # Load the launch agent
                 subprocess.run(["launchctl", "load", str(plist_path)], check=False)
             else:
@@ -978,7 +987,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Startup Setting Error",
-                f"Could not {'enable' if enable else 'disable'} run at startup:\n{e}"
+                f"Could not {'enable' if enable else 'disable'} run at startup:\n{e}",
             )
 
     def _restore_geometry(self):
@@ -989,7 +998,7 @@ class MainWindow(QMainWindow):
                 geometry.get("x", 100),
                 geometry.get("y", 100),
                 geometry.get("width", 380),
-                geometry.get("height", 600)
+                geometry.get("height", 600),
             )
         else:
             # Default: position on right side of screen
@@ -999,7 +1008,7 @@ class MainWindow(QMainWindow):
             x = screen.right() - window_width
             y = (screen.height() - window_height) // 2  # Center vertically
             self.setGeometry(x, y, window_width, window_height)
-        
+
         if self.config_manager.get_stay_on_top():
             self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
@@ -1028,7 +1037,7 @@ class MainWindow(QMainWindow):
         """Snap window to screen edge if close enough."""
         screen = QApplication.primaryScreen().geometry()
         window_geo = self.geometry()
-        
+
         # Check left edge
         if abs(window_geo.left() - screen.left()) < self.edge_snap_threshold:
             self.move(screen.left(), window_geo.top())
@@ -1046,13 +1055,10 @@ class MainWindow(QMainWindow):
         """Handle window close event."""
         # Save geometry
         geo = self.geometry()
-        self.config_manager.set_window_geometry({
-            "x": geo.x(),
-            "y": geo.y(),
-            "width": geo.width(),
-            "height": geo.height()
-        })
-        
+        self.config_manager.set_window_geometry(
+            {"x": geo.x(), "y": geo.y(), "width": geo.width(), "height": geo.height()}
+        )
+
         # Hide instead of close if tray is available
         if QSystemTrayIcon.isSystemTrayAvailable():
             event.ignore()

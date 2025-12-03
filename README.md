@@ -23,33 +23,39 @@ A handy PySide6 GUI application for monitoring the status of one or many cloud d
 ## Installation
 
 1. Install `uv` if you haven't already:
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 2. Clone this repository:
+
 ```bash
 git clone https://github.com/yourusername/check-cloud-drives.git
 cd check-cloud-drives
 ```
 
 3. Install dependencies using `uv`:
+
 ```bash
 uv sync
 ```
 
 This will:
+
 - Create a virtual environment automatically
 - Install all dependencies from `pyproject.toml`
 - Make the project ready to run
 
 **Alternative:** If you prefer using `pip` with a `requirements.txt` file, you can generate it first:
+
 ```bash
 uv pip compile pyproject.toml -o requirements.txt
 pip install -r requirements.txt
 ```
 
 4. Make sure rclone is installed and configured:
+
 ```bash
 rclone listremotes
 ```
@@ -57,22 +63,26 @@ rclone listremotes
 ## Usage
 
 1. Run the application using the provided script:
+
 ```bash
 ./run.sh
 ```
 
 Or run directly with `uv`:
+
 ```bash
 uv run -m check_cloud_drives.main
 ```
 
 Or activate the virtual environment and run directly:
+
 ```bash
 source .venv/bin/activate  # On macOS/Linux
 python -m check_cloud_drives.main
 ```
 
 2. On first run, the app will:
+
    - Detect all available rclone remotes
    - Show a setup dialog to select which drives to monitor
    - Automatically fetch status for selected drives
@@ -88,6 +98,7 @@ python -m check_cloud_drives.main
 ## Configuration
 
 The application stores all configuration in `CheckCloudDrivesConfig.toml` in the project root directory. This file includes:
+
 - List of monitored drives
 - Window position and size
 - Stay on top preference
@@ -106,6 +117,7 @@ The app supports custom SVG icons for different drive types (Google Drive, OneDr
 ## Development
 
 The application is built with:
+
 - **PySide6** - Modern Qt6 Python bindings
 - **rclone** - Command-line tool for cloud storage
 - **uv** - Fast Python package installer and resolver
@@ -113,16 +125,19 @@ The application is built with:
 ### Development Setup
 
 1. Install `uv` (if not already installed):
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 2. Sync dependencies:
+
 ```bash
 uv sync
 ```
 
 3. Run the application:
+
 ```bash
 uv run -m check_cloud_drives.main
 ```
@@ -130,6 +145,7 @@ uv run -m check_cloud_drives.main
 ### Adding Dependencies
 
 To add a new dependency:
+
 ```bash
 uv add package-name
 ```
@@ -139,16 +155,41 @@ This will automatically update `pyproject.toml` and `uv.lock`.
 ### Updating Dependencies
 
 To update all dependencies:
+
 ```bash
 uv sync --upgrade
 ```
 
 To update a specific package:
+
 ```bash
 uv add package-name@latest
 ```
 
 **Note:** The `uv.lock` file should be committed to version control to ensure reproducible builds across different environments.
+
+### Code Quality
+
+This project uses [Ruff](https://github.com/astral-sh/ruff) for linting and formatting Python code.
+
+**Run Ruff checks:**
+
+```bash
+./scripts/ruff.sh          # Run all checks (format + lint)
+./scripts/ruff.sh format   # Format all Python files
+./scripts/ruff.sh fix      # Format and auto-fix linting issues
+./scripts/ruff.sh lint     # Show linting issues
+```
+
+**Available commands:**
+
+- `format` - Format all Python files
+- `check-format` - Check formatting without making changes
+- `lint` - Lint all Python files (show issues only)
+- `lint-fix` - Lint and auto-fix all Python files
+- `check` - Check linting without making changes
+- `all` - Run format check + lint check (default)
+- `fix` - Format + auto-fix linting issues
 
 ### Generating requirements.txt
 
@@ -173,4 +214,3 @@ MIT License - feel free to use and modify as needed!
 ## Contributing
 
 Contributions welcome! Please feel free to submit a Pull Request.
-

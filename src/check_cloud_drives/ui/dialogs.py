@@ -1,22 +1,31 @@
 """Dialog components for the application."""
 
-from typing import List
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QListWidget, QListWidgetItem, QDialogButtonBox
-)
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QVBoxLayout,
+)
+
 from ..models import DriveConfig
 
 
 class SetupDialog(QDialog):
     """Dialog for initial setup and adding drives."""
-    
-    def __init__(self, available_remotes: List[str], existing_drives: List[DriveConfig], parent=None):
+
+    def __init__(
+        self, available_remotes: list[str], existing_drives: list[DriveConfig], parent=None
+    ):
         super().__init__(parent)
         self.available_remotes = available_remotes
         self.existing_remotes = {d.remote_name for d in existing_drives}
-        self.selected_drives: List[DriveConfig] = []
+        self.selected_drives: list[DriveConfig] = []
         self.setWindowTitle("Setup Cloud Drives")
         self.setModal(True)
         self._setup_ui()
@@ -41,20 +50,20 @@ class SetupDialog(QDialog):
                 font-family: "AtkynsonMono Nerd Font Propo", monospace;
             }
         """)
-        
+
         layout = QVBoxLayout(self)
-        
+
         # Instructions
         instructions = QLabel(
             "Select the cloud drives you want to monitor, or add a new one manually."
         )
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
-        
+
         # Available remotes list
         list_label = QLabel("Available Rclone Remotes:")
         layout.addWidget(list_label)
-        
+
         self.remotes_list = QListWidget()
         for remote in self.available_remotes:
             if remote not in self.existing_remotes:
@@ -62,7 +71,7 @@ class SetupDialog(QDialog):
                 item.setCheckState(Qt.Unchecked)
                 self.remotes_list.addItem(item)
         layout.addWidget(self.remotes_list)
-        
+
         # Manual entry
         manual_layout = QHBoxLayout()
         manual_layout.addWidget(QLabel("Or add manually:"))
@@ -73,11 +82,9 @@ class SetupDialog(QDialog):
         add_btn.clicked.connect(self._add_manual)
         manual_layout.addWidget(add_btn)
         layout.addLayout(manual_layout)
-        
+
         # Buttons
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        )
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -102,9 +109,7 @@ class SetupDialog(QDialog):
                 drive_type = self._guess_drive_type(remote_name)
                 self.selected_drives.append(
                     DriveConfig(
-                        remote_name=remote_name,
-                        display_name=display_name,
-                        drive_type=drive_type
+                        remote_name=remote_name, display_name=display_name, drive_type=drive_type
                     )
                 )
         super().accept()
@@ -130,4 +135,3 @@ class SetupDialog(QDialog):
             return "protondrive"
         else:
             return "unknown"
-
