@@ -132,6 +132,9 @@ class MainWindow(QMainWindow):
         self.overlay_sync_timer = QTimer()  # Timer to sync overlay with dialog visibility
         self.overlay_sync_timer.timeout.connect(self._sync_overlay_with_dialog)
         self.overlay_sync_timer.setInterval(100)  # Check every 100ms
+        self.dialog_raise_timer = QTimer()  # Timer to ensure dialog stays on top
+        self.dialog_raise_timer.timeout.connect(self._ensure_dialog_on_top)
+        self.dialog_raise_timer.setInterval(200)  # Check every 200ms
 
         self._setup_ui()
         self._setup_tray()
@@ -515,8 +518,13 @@ class MainWindow(QMainWindow):
             # Connect overlay to dialog visibility and start sync timer
             dialog.finished.connect(self._on_dialog_finished)
             self.overlay_sync_timer.start()
+            self.dialog_raise_timer.start()
+            # Show and raise dialog before exec
+            dialog.show()
+            self._bring_dialog_to_front()
             result = dialog.exec()
             self.overlay_sync_timer.stop()
+            self.dialog_raise_timer.stop()
             self._hide_overlay()
             self.active_dialog = None
             if result == QDialog.Accepted:
@@ -571,8 +579,13 @@ class MainWindow(QMainWindow):
         # Connect overlay to dialog visibility and start sync timer
         dialog.finished.connect(self._on_dialog_finished)
         self.overlay_sync_timer.start()
+        self.dialog_raise_timer.start()
+        # Show and raise dialog before exec
+        dialog.show()
+        self._bring_dialog_to_front()
         result = dialog.exec()
         self.overlay_sync_timer.stop()
+        self.dialog_raise_timer.stop()
         self._hide_overlay()
         self.active_dialog = None
         if result == QDialog.Accepted:
@@ -1240,6 +1253,7 @@ class MainWindow(QMainWindow):
     def _on_dialog_finished(self, result):
         """Handle dialog finished - ensure overlay is hidden."""
         self.overlay_sync_timer.stop()
+        self.dialog_raise_timer.stop()
         self._hide_overlay()
         self.active_dialog = None
 
@@ -1252,6 +1266,9 @@ class MainWindow(QMainWindow):
             self._sync_overlay_with_dialog()
         elif event.type() == event.Type.ActivationChange:
             self._sync_overlay_with_dialog()
+            # When window is activated, bring dialog to front
+            if self.isActiveWindow() and self.active_dialog:
+                self._bring_dialog_to_front()
 
     def _sync_overlay_with_dialog(self):
         """Sync overlay visibility with active dialog visibility."""
@@ -1259,9 +1276,27 @@ class MainWindow(QMainWindow):
             # Check if dialog is visible
             if self.active_dialog.isVisible():
                 self._show_overlay()
+                # Ensure dialog is on top
+                self._bring_dialog_to_front()
             else:
                 # Dialog is hidden (e.g., app switched) - hide overlay
                 self._hide_overlay()
+
+    def _bring_dialog_to_front(self):
+        """Bring the active dialog to the front above the main window."""
+        if self.active_dialog and self.active_dialog.isVisible():
+            # Raise the dialog above this window
+            self.active_dialog.raise_()
+            self.active_dialog.activateWindow()
+            # Ensure it's shown if it was hidden
+            if not self.active_dialog.isVisible():
+                self.active_dialog.show()
+    
+    def _ensure_dialog_on_top(self):
+        """Ensure dialog stays on top of main window - called periodically by timer."""
+        if self.active_dialog and self.active_dialog.isVisible() and self.isActiveWindow():
+            # Main window is active - ensure dialog is raised above it
+            self._bring_dialog_to_front()
 
     def resizeEvent(self, event):
         """Handle window resize to update overlay size."""

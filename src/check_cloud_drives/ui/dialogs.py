@@ -39,6 +39,7 @@ class SetupDialog(QDialog):
         self.setMinimumSize(500, 600)
         self.resize(500, 600)
         self._setup_ui()
+        self._parent_window = parent
 
     def _setup_ui(self):
         """Set up the setup dialog UI."""
@@ -279,3 +280,30 @@ class SetupDialog(QDialog):
             return "protondrive"
         else:
             return "unknown"
+
+    def showEvent(self, event):
+        """Handle show event - ensure dialog is raised above parent window."""
+        super().showEvent(event)
+        self._raise_above_parent()
+
+    def changeEvent(self, event):
+        """Handle window state changes - ensure dialog stays on top when app is activated."""
+        super().changeEvent(event)
+        if event.type() == event.Type.WindowStateChange or event.type() == event.Type.ActivationChange:
+            # When window is activated or state changes, raise dialog above parent
+            if self.isVisible():
+                self._raise_above_parent()
+
+    def _raise_above_parent(self):
+        """Raise dialog above parent window."""
+        if self._parent_window:
+            # Raise parent first, then raise dialog above it
+            self._parent_window.raise_()
+            self._parent_window.activateWindow()
+            # Then raise and activate the dialog
+            self.raise_()
+            self.activateWindow()
+        else:
+            # No parent - just raise and activate
+            self.raise_()
+            self.activateWindow()
