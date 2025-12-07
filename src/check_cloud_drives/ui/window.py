@@ -210,6 +210,22 @@ class MainWindow(QMainWindow):
 
         scroll.setWidget(scroll_widget)
 
+        # Calculate standard button height first (needed for settings page buttons)
+        # Create a reference button to get standard height (matching dialog buttons)
+        # Use same styling as dialog buttons: padding 6px 12px, font-size 12px, font-weight bold
+        ref_button = QPushButton("Cancel")
+        ref_button.setStyleSheet("""
+            QPushButton {
+                font-family: "AtkynsonMono Nerd Font Propo", monospace;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 4px;
+                padding: 6px 12px;
+            }
+        """)
+        self.standard_button_height = ref_button.sizeHint().height()
+        ref_button.deleteLater()
+
         # Settings page (initially hidden)
         self.settings_page = self._create_settings_page()
         self.settings_page.hide()
@@ -283,26 +299,10 @@ class MainWindow(QMainWindow):
 
         controls.addStretch()
 
-        # Create a reference button to get standard height (matching dialog buttons)
-        # Use same styling as dialog buttons: padding 6px 12px, font-size 12px, font-weight bold
-        ref_button = QPushButton("Cancel")
-        ref_button.setStyleSheet("""
-            QPushButton {
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-                font-size: 12px;
-                font-weight: bold;
-                border-radius: 4px;
-                padding: 6px 12px;
-            }
-        """)
-        self.standard_button_height = ref_button.sizeHint().height()
-        ref_button.deleteLater()
-        
         # Hide button (blue) - same font and height as dialog buttons
         hide_btn = QPushButton("Hide")
-        hide_btn.setFixedHeight(self.standard_button_height)
-        hide_btn.setStyleSheet("""
-            QPushButton {
+        hide_btn.setStyleSheet(f"""
+            QPushButton {{
                 font-family: "AtkynsonMono Nerd Font Propo", monospace;
                 font-size: 12px;
                 font-weight: bold;
@@ -311,22 +311,25 @@ class MainWindow(QMainWindow):
                 border: none;
                 border-radius: 4px;
                 padding: 6px 12px;
-            }
-            QPushButton:hover {
+                min-height: {self.standard_button_height}px;
+                max-height: {self.standard_button_height}px;
+                height: {self.standard_button_height}px;
+            }}
+            QPushButton:hover {{
                 background-color: #2980b9;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: #21618c;
-            }
+            }}
         """)
+        hide_btn.setFixedHeight(self.standard_button_height)
         hide_btn.clicked.connect(self.hide)
         controls.addWidget(hide_btn, alignment=Qt.AlignVCenter)
 
         # Exit button (red) - same font and height as dialog buttons
         exit_btn = QPushButton("Exit")
-        exit_btn.setFixedHeight(self.standard_button_height)
-        exit_btn.setStyleSheet("""
-            QPushButton {
+        exit_btn.setStyleSheet(f"""
+            QPushButton {{
                 font-family: "AtkynsonMono Nerd Font Propo", monospace;
                 font-size: 12px;
                 font-weight: bold;
@@ -335,18 +338,30 @@ class MainWindow(QMainWindow):
                 border: none;
                 border-radius: 4px;
                 padding: 6px 12px;
-            }
-            QPushButton:hover {
+                min-height: {self.standard_button_height}px;
+                max-height: {self.standard_button_height}px;
+                height: {self.standard_button_height}px;
+            }}
+            QPushButton:hover {{
                 background-color: #c0392b;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: #a93226;
-            }
+            }}
         """)
+        exit_btn.setFixedHeight(self.standard_button_height)
         exit_btn.clicked.connect(QApplication.quit)
         controls.addWidget(exit_btn, alignment=Qt.AlignVCenter)
 
         layout.addLayout(controls)
+
+        # Create overlay for dimming when dialog is shown
+        # Overlay covers the entire central widget
+        self.overlay = QWidget(central)
+        self.overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.5);")
+        self.overlay.hide()
+        self.overlay.setAttribute(Qt.WA_TransparentForMouseEvents, False)  # Block mouse events
+        self.overlay.lower()  # Start below other widgets
 
         # Apply light theme with AtkynsonMono Nerd Font Propo
         self.setStyleSheet("""
@@ -490,8 +505,11 @@ class MainWindow(QMainWindow):
         available_remotes = self._get_available_remotes()
         if available_remotes:
             drive_order = []  # Empty for first run
+            self._show_overlay()
             dialog = SetupDialog(available_remotes, [], drive_order, self)
-            if dialog.exec() == QDialog.Accepted:
+            result = dialog.exec()
+            self._hide_overlay()
+            if result == QDialog.Accepted:
                 for drive_config in dialog.selected_drives:
                     self._add_drive_card(drive_config)
                 self._save_drives()
@@ -537,8 +555,11 @@ class MainWindow(QMainWindow):
         available_remotes = self._get_available_remotes()
         existing_drives = self.config_manager.get_drives()
         drive_order = self.config_manager.get_drive_order()
+        self._show_overlay()
         dialog = SetupDialog(available_remotes, existing_drives, drive_order, self)
-        if dialog.exec() == QDialog.Accepted:
+        result = dialog.exec()
+        self._hide_overlay()
+        if result == QDialog.Accepted:
             # Get list of selected remote names
             selected_remote_names = {d.remote_name for d in dialog.selected_drives}
             existing_remote_names = set(self.drive_cards.keys())
@@ -942,52 +963,56 @@ class MainWindow(QMainWindow):
         button_layout.addStretch()
 
         # Use the exact same height as Hide/Exit buttons
-        # Use self.standard_button_height which was calculated in _setup_ui
-        button_height = self.standard_button_height if self.standard_button_height else 30  # Fallback if not set
-        
+        # Use self.standard_button_height which was calculated earlier in _setup_ui
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFixedHeight(button_height)
-        cancel_btn.setStyleSheet("""
-            QPushButton {
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                font-family: "AtkynsonMono Nerd Font Propo", monospace;
+                font-size: 12px;
+                font-weight: bold;
                 background-color: #95a5a6;
                 color: white;
                 border: none;
                 border-radius: 4px;
                 padding: 6px 12px;
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
+                min-height: {self.standard_button_height}px;
+                max-height: {self.standard_button_height}px;
+                height: {self.standard_button_height}px;
+            }}
+            QPushButton:hover {{
                 background-color: #7f8c8d;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: #6c7a7b;
-            }
+            }}
         """)
+        cancel_btn.setFixedHeight(self.standard_button_height)
         cancel_btn.clicked.connect(self._cancel_settings)
         button_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Save")
-        save_btn.setFixedHeight(button_height)
-        save_btn.setStyleSheet("""
-            QPushButton {
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                font-family: "AtkynsonMono Nerd Font Propo", monospace;
+                font-size: 12px;
+                font-weight: bold;
                 background-color: #27ae60;
                 color: white;
                 border: none;
                 border-radius: 4px;
                 padding: 6px 12px;
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
+                min-height: {self.standard_button_height}px;
+                max-height: {self.standard_button_height}px;
+                height: {self.standard_button_height}px;
+            }}
+            QPushButton:hover {{
                 background-color: #229954;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: #1e8449;
-            }
+            }}
         """)
+        save_btn.setFixedHeight(self.standard_button_height)
         save_btn.clicked.connect(self._save_settings)
         button_layout.addWidget(save_btn)
         button_layout.addStretch()
@@ -1180,6 +1205,29 @@ class MainWindow(QMainWindow):
             self.is_dragging = False
             self._snap_to_edge()
         event.accept()
+
+    def _show_overlay(self):
+        """Show the dimming overlay over the main window."""
+        if hasattr(self, 'overlay'):
+            central = self.centralWidget()
+            if central:
+                # Position overlay to cover entire central widget
+                self.overlay.setGeometry(0, 0, central.width(), central.height())
+                self.overlay.show()
+                self.overlay.raise_()  # Bring to front
+
+    def _hide_overlay(self):
+        """Hide the dimming overlay."""
+        if hasattr(self, 'overlay'):
+            self.overlay.hide()
+
+    def resizeEvent(self, event):
+        """Handle window resize to update overlay size."""
+        super().resizeEvent(event)
+        if hasattr(self, 'overlay') and self.overlay.isVisible():
+            central = self.centralWidget()
+            if central:
+                self.overlay.setGeometry(central.geometry())
 
     def _snap_to_edge(self):
         """Snap window to screen edge if close enough."""

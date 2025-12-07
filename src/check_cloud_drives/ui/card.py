@@ -171,6 +171,13 @@ class DriveCard(QFrame):
         self._setup_ui()
         # Store the initial minimum height to maintain card size in edit mode
         self._initial_min_height = self.minimumHeight()
+        # Store original stylesheet for drag/drop restoration
+        self._original_stylesheet = self.styleSheet()
+        # Store height for drag over effect
+        self._drag_over_height = None
+        # Store original content for drag preview restoration
+        self._original_content_state = None
+        self._preview_target_card = None  # Card showing preview content
 
     def _setup_ui(self):
         """Set up the UI for the drive card."""
@@ -982,60 +989,238 @@ class DriveCard(QFrame):
 
         event.accept()
 
+    def _store_content_state(self):
+        """Store the current card's content state for restoration."""
+        state = {
+            'display_name': self.drive_config.display_name,
+            'status_text': self.status_label.text() if hasattr(self, 'status_label') else '',
+            'status_style': self.status_label.styleSheet() if hasattr(self, 'status_label') else '',
+            'info_text': self.info_label.text() if hasattr(self, 'info_label') else '',
+            'free_space_text': self.free_space_label.text() if hasattr(self, 'free_space_label') else '',
+            'free_space_visible': self.free_space_label.isVisible() if hasattr(self, 'free_space_label') else False,
+            'remote_name': self.drive_config.remote_name,
+            'icon_pixmap': self.icon_label.pixmap() if hasattr(self, 'icon_label') and self.icon_label.pixmap() else None,
+            'drive_status': self.drive_status,
+            'is_updating': self.is_updating,
+            'last_updated_str': self.last_updated_str,
+        }
+        return state
+    
+    def _copy_content_from(self, source_card):
+        """Copy content from another card to this card."""
+        if not source_card:
+            return
+        
+        # Store original state if not already stored
+        if self._original_content_state is None:
+            self._original_content_state = self._store_content_state()
+        
+        # Copy display name
+        self.drive_config.display_name = source_card.drive_config.display_name
+        self.update_display_name(source_card.drive_config.display_name)
+        
+        # Copy status
+        if hasattr(source_card, 'status_label') and hasattr(self, 'status_label'):
+            self.status_label.setText(source_card.status_label.text())
+            self.status_label.setStyleSheet(source_card.status_label.styleSheet())
+        
+        # Copy info
+        if hasattr(source_card, 'info_label') and hasattr(self, 'info_label'):
+            self.info_label.setText(source_card.info_label.text())
+        
+        # Copy free space
+        if hasattr(source_card, 'free_space_label') and hasattr(self, 'free_space_label'):
+            self.free_space_label.setText(source_card.free_space_label.text())
+            if source_card.free_space_label.isVisible():
+                self.free_space_label.show()
+            else:
+                self.free_space_label.hide()
+        
+        # Copy remote name
+        self.drive_config.remote_name = source_card.drive_config.remote_name
+        if hasattr(source_card, 'remote_name_label') and hasattr(self, 'remote_name_label'):
+            self.remote_name_label.setText(source_card.remote_name_label.text())
+        
+        # Copy icon
+        if hasattr(source_card, 'icon_label') and hasattr(self, 'icon_label'):
+            if source_card.icon_label.pixmap():
+                self.icon_label.setPixmap(source_card.icon_label.pixmap())
+        
+        # Copy status object
+        self.drive_status = source_card.drive_status
+        self.is_updating = source_card.is_updating
+        self.last_updated_str = source_card.last_updated_str
+        
+        # Update update indicator
+        if source_card.is_updating:
+            self.set_updating(True)
+        else:
+            self.set_updating(False)
+    
+    def _restore_content_state(self):
+        """Restore the card's original content state."""
+        if self._original_content_state is None:
+            return
+        
+        state = self._original_content_state
+        
+        # Restore display name
+        self.drive_config.display_name = state['display_name']
+        self.update_display_name(state['display_name'])
+        
+        # Restore status
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(state['status_text'])
+            self.status_label.setStyleSheet(state['status_style'])
+        
+        # Restore info
+        if hasattr(self, 'info_label'):
+            self.info_label.setText(state['info_text'])
+        
+        # Restore free space
+        if hasattr(self, 'free_space_label'):
+            self.free_space_label.setText(state['free_space_text'])
+            if state['free_space_visible']:
+                self.free_space_label.show()
+            else:
+                self.free_space_label.hide()
+        
+        # Restore remote name
+        self.drive_config.remote_name = state['remote_name']
+        if hasattr(self, 'remote_name_label'):
+            self.remote_name_label.setText(f"Remote: {state['remote_name']}")
+        
+        # Restore icon
+        if hasattr(self, 'icon_label') and state['icon_pixmap']:
+            self.icon_label.setPixmap(state['icon_pixmap'])
+        
+        # Restore status object
+        self.drive_status = state['drive_status']
+        self.is_updating = state['is_updating']
+        self.last_updated_str = state.get('last_updated_str')
+        
+        # Restore update indicator
+        if state['is_updating']:
+            self.set_updating(True)
+        else:
+            self.set_updating(False)
+        
+        # Clear stored state
+        self._original_content_state = None
+        self._preview_target_card = None
+
     def dragEnterEvent(self, event):
         """Handle drag enter event."""
         if event.mimeData().hasText() and event.mimeData().text() != self.drive_config.remote_name:
             event.acceptProposedAction()
-            # Visual feedback
-            self.setStyleSheet(
-                self.styleSheet()
-                + """
-                QFrame {
-                    border-color: #4a90e2;
-                    border-width: 3px;
-                }
-            """
-            )
-
-    def dragLeaveEvent(self, event):
-        """Handle drag leave event."""
-        # Reset visual feedback - restore original border
+            dragged_remote = event.mimeData().text()
+            
+            # Find the card being dragged
+            dragged_card = None
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, "drive_cards"):
+                    dragged_card = parent.drive_cards.get(dragged_remote)
+                    break
+                parent = parent.parent()
+            
+            if dragged_card:
+                # Store the dragged card's original content if not already stored
+                if dragged_card._original_content_state is None:
+                    dragged_card._original_content_state = dragged_card._store_content_state()
+                    dragged_card._preview_target_card = self
+                
+                # Copy this card's content to the dragged card (preview)
+                dragged_card._copy_content_from(self)
+            
+            # Store current height and set fixed height to maintain card size (like edit mode)
+            current_height = self.sizeHint().height()
+            if current_height <= 0:
+                current_height = self.height()
+            if current_height > 0:
+                self._drag_over_height = current_height
+                self.setFixedHeight(current_height)
+            
+            # Hide all content widgets (like edit mode does)
+            if hasattr(self, 'icon_label'):
+                self.icon_label.hide()
+            if hasattr(self, 'header_layout_widget'):
+                self.header_layout_widget.hide()
+            if hasattr(self, 'status_label'):
+                self.status_label.hide()
+            if hasattr(self, 'info_label'):
+                self.info_label.hide()
+            if hasattr(self, 'free_space_label'):
+                self.free_space_label.hide()
+            if hasattr(self, 'settings_button'):
+                self.settings_button.hide()
+            if hasattr(self, 'update_spacer'):
+                self.update_spacer.hide()
+            if hasattr(self, 'remote_name_label'):
+                self.remote_name_label.hide()
+            if hasattr(self, 'update_indicator'):
+                self.update_indicator.hide()
+            if hasattr(self, 'name_container'):
+                self.name_container.hide()
+            
+            # Set grey background to show it's a drop target
         self.setStyleSheet("""
             QFrame {
-                background-color: #ffffff;
-                border: 2px solid #e0e0e0;
+                    background-color: #e0e0e0;
+                    border: 2px solid #bdc3c7;
                 border-radius: 12px;
-                padding: 12px;
+                    padding: 4px 6px;
                 margin: 4px;
                 font-family: "AtkynsonMono Nerd Font Propo", monospace;
             }
-            QFrame:hover {
-                border-color: #4a90e2;
-                background-color: #f8f9fa;
-            }
-            QFrame[dragging="true"] {
-                opacity: 0.5;
-            }
-            QLineEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 4px;
-                color: #2c3e50;
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-            }
-            QLineEdit:focus {
-                border-color: #4a90e2;
-                background-color: #ffffff;
-            }
-            QLabel {
-                color: #2c3e50;
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-            }
-        """)
+            """)
+
+    def dragLeaveEvent(self, event):
+        """Handle drag leave event."""
+        # Restore height constraints (like exit edit mode)
+        self.setMinimumHeight(0)
+        self.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX equivalent
+        self._drag_over_height = None
+        
+        # Restore original appearance - show all content and restore stylesheet
+        if hasattr(self, 'icon_label'):
+            self.icon_label.show()
+        if hasattr(self, 'header_layout_widget'):
+            self.header_layout_widget.show()
+        if hasattr(self, 'status_label'):
+            self.status_label.show()
+        if hasattr(self, 'info_label'):
+            self.info_label.show()
+        if hasattr(self, 'free_space_label'):
+            self.free_space_label.show()
+        if hasattr(self, 'settings_button'):
+            self.settings_button.show()
+        if hasattr(self, 'update_spacer'):
+            self.update_spacer.show()
+        if hasattr(self, 'remote_name_label'):
+            self.remote_name_label.show()
+        if hasattr(self, 'update_indicator') and self.is_updating:
+            self.update_indicator.show()
+        if hasattr(self, 'name_container'):
+            self.name_container.show()
+        # Restore original stylesheet
+        self.setStyleSheet(self._original_stylesheet)
+        
+        # Restore the dragged card's original content if it was showing preview
+        if event.mimeData().hasText():
+            dragged_remote = event.mimeData().text()
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, "drive_cards"):
+                    dragged_card = parent.drive_cards.get(dragged_remote)
+                    if dragged_card and dragged_card._preview_target_card == self:
+                        dragged_card._restore_content_state()
+                    break
+                parent = parent.parent()
 
     def dropEvent(self, event):
         """Handle drop event."""
+        dragged_remote = None
         if event.mimeData().hasText():
             dragged_remote = event.mimeData().text()
             if dragged_remote != self.drive_config.remote_name:
@@ -1048,37 +1233,42 @@ class DriveCard(QFrame):
                     parent = parent.parent()
             event.acceptProposedAction()
 
-        # Reset visual feedback - restore original border
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #ffffff;
-                border: 2px solid #e0e0e0;
-                border-radius: 12px;
-                padding: 12px;
-                margin: 4px;
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-            }
-            QFrame:hover {
-                border-color: #4a90e2;
-                background-color: #f8f9fa;
-            }
-            QFrame[dragging="true"] {
-                opacity: 0.5;
-            }
-            QLineEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 4px;
-                color: #2c3e50;
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-            }
-            QLineEdit:focus {
-                border-color: #4a90e2;
-                background-color: #ffffff;
-            }
-            QLabel {
-                color: #2c3e50;
-                font-family: "AtkynsonMono Nerd Font Propo", monospace;
-            }
-        """)
+        # Restore height constraints (like exit edit mode)
+        self.setMinimumHeight(0)
+        self.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX equivalent
+        self._drag_over_height = None
+        
+        # Restore original appearance - show all content and restore stylesheet
+        if hasattr(self, 'icon_label'):
+            self.icon_label.show()
+        if hasattr(self, 'header_layout_widget'):
+            self.header_layout_widget.show()
+        if hasattr(self, 'status_label'):
+            self.status_label.show()
+        if hasattr(self, 'info_label'):
+            self.info_label.show()
+        if hasattr(self, 'free_space_label'):
+            self.free_space_label.show()
+        if hasattr(self, 'settings_button'):
+            self.settings_button.show()
+        if hasattr(self, 'update_spacer'):
+            self.update_spacer.show()
+        if hasattr(self, 'remote_name_label'):
+            self.remote_name_label.show()
+        if hasattr(self, 'update_indicator') and self.is_updating:
+            self.update_indicator.show()
+        if hasattr(self, 'name_container'):
+            self.name_container.show()
+        # Restore original stylesheet
+        self.setStyleSheet(self._original_stylesheet)
+        
+        # Restore the dragged card's original content (drop completed, so restore preview)
+        if dragged_remote:
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, "drive_cards"):
+                    dragged_card = parent.drive_cards.get(dragged_remote)
+                    if dragged_card and dragged_card._preview_target_card == self:
+                        dragged_card._restore_content_state()
+                    break
+                parent = parent.parent()
