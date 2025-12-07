@@ -1264,17 +1264,25 @@ class DriveCard(QFrame):
             self.update_indicator.show()
         if hasattr(self, 'name_container'):
             self.name_container.show()
-        # Restore original stylesheet
+        # Restore original stylesheet (remove grey background)
         self.setStyleSheet(self._original_stylesheet)
         
-        # Restore the dragged card's original content (drop completed, so restore preview)
+        # Restore the dragged card's original content and stylesheet (drop completed, so restore preview)
         if dragged_remote:
             parent = self.parent()
             while parent:
                 if hasattr(parent, "drive_cards"):
                     dragged_card = parent.drive_cards.get(dragged_remote)
-                    if dragged_card and dragged_card._preview_target_card == self:
-                        dragged_card._restore_content_state()
+                    if dragged_card:
+                        # Restore dragged card's content state
+                        if dragged_card._preview_target_card == self:
+                            dragged_card._restore_content_state()
+                        # Ensure dragged card's stylesheet is also restored (remove any grey color)
+                        dragged_card.setStyleSheet(dragged_card._original_stylesheet)
+                        # Clear dragging property if set
+                        dragged_card.setProperty("dragging", False)
+                        dragged_card.style().unpolish(dragged_card)
+                        dragged_card.style().polish(dragged_card)
                     break
                 parent = parent.parent()
         
