@@ -1,5 +1,7 @@
 """Dialog components for the application."""
 
+import subprocess
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -9,6 +11,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
 )
@@ -39,7 +42,6 @@ class SetupDialog(QDialog):
         self.setMinimumSize(500, 600)
         self.resize(500, 600)
         self._setup_ui()
-        self._parent_window = parent
 
     def _setup_ui(self):
         """Set up the setup dialog UI."""
@@ -137,7 +139,7 @@ class SetupDialog(QDialog):
 
         # Manual entry
         manual_layout = QHBoxLayout()
-        manual_layout.addWidget(QLabel("Or add manually:"))
+        manual_layout.addWidget(QLabel("Add manually:"))
         self.manual_remote = QLineEdit()
         self.manual_remote.setPlaceholderText("Enter rclone remote name")
         manual_layout.addWidget(self.manual_remote)
@@ -204,22 +206,94 @@ class SetupDialog(QDialog):
         
         layout.addWidget(buttons)
 
+    def _show_centered_message(self, title: str, message: str, icon=QMessageBox.Warning):
+        """Show a message box centered over this dialog."""
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(icon)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        
+        # Center over parent dialog
+        dialog_geometry = self.geometry()
+        msg_box.adjustSize()
+        msg_box.move(
+            dialog_geometry.center().x() - msg_box.width() // 2,
+            dialog_geometry.center().y() - msg_box.height() // 2
+        )
+        
+        msg_box.exec()
+
+    def _normalize_remote_name(self, remote_name: str) -> str:
+        """Normalize remote name by removing trailing colon if present.
+        
+        Rclone remote names can be entered with or without a trailing colon.
+        This function ensures consistent storage without the colon.
+        """
+        if not remote_name:
+            return remote_name
+        return remote_name.strip().rstrip(":")
+
     def _add_manual(self):
         """Add manually entered remote."""
         from PySide6.QtGui import QFont
 
-        remote_name = self.manual_remote.text().strip()
+        remote_name = self._normalize_remote_name(self.manual_remote.text())
         if remote_name:
-            # Check if it already exists in the list
+            # Check if it already exists in the list (compare normalized names)
             for i in range(self.remotes_list.count()):
                 item = self.remotes_list.item(i)
-                if item.text() == remote_name:
+                # Normalize the existing item's text for comparison
+                existing_name = self._normalize_remote_name(item.text())
+                if existing_name == remote_name:
                     # Already exists, just check it
                     item.setCheckState(Qt.Checked)
                     self.manual_remote.clear()
                     return
             
-            # Add new item
+            # Validate remote by running rclone about command
+            # Ensure remote name ends with colon for rclone command
+            remote_with_colon = remote_name if remote_name.endswith(":") else remote_name + ":"
+            
+            try:
+                result = subprocess.run(
+                    ["rclone", "about", remote_with_colon],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if result.returncode != 0:
+                    # Remote is not set up in rclone
+                    self._show_centered_message(
+                        "Remote Not Found",
+                        f"The remote '{remote_name}' has not been set up in rclone.\n\n"
+                        f"Please configure this remote using 'rclone config' before adding it.",
+                    )
+                    return  # Don't add the remote, return to dialog
+                
+            except subprocess.TimeoutExpired:
+                self._show_centered_message(
+                    "Validation Timeout",
+                    f"Timeout while validating remote '{remote_name}'.\n\n"
+                    f"Please check your rclone configuration and try again.",
+                )
+                return
+            except FileNotFoundError:
+                self._show_centered_message(
+                    "rclone Not Found",
+                    "rclone is not installed or not in PATH.\n\n"
+                    "Please install rclone from https://rclone.org/install/",
+                )
+                return
+            except Exception as e:
+                self._show_centered_message(
+                    "Validation Error",
+                    f"Error validating remote '{remote_name}': {str(e)}",
+                )
+                return
+            
+            # Validation passed - add new item with normalized name
             item = QListWidgetItem(remote_name)
             app_font = QFont("AtkynsonMono Nerd Font Propo", 13)
             item.setFont(app_font)
@@ -236,7 +310,8 @@ class SetupDialog(QDialog):
         
         for i in range(self.remotes_list.count()):
             item = self.remotes_list.item(i)
-            remote_name = item.text()
+            # Normalize remote name to ensure consistency (remove trailing colon if present)
+            remote_name = self._normalize_remote_name(item.text())
             
             if item.checkState() == Qt.Checked:
                 # Drive is checked - add to selected
@@ -281,29 +356,3 @@ class SetupDialog(QDialog):
         else:
             return "unknown"
 
-    def showEvent(self, event):
-        """Handle show event - ensure dialog is raised above parent window."""
-        super().showEvent(event)
-        self._raise_above_parent()
-
-    def changeEvent(self, event):
-        """Handle window state changes - ensure dialog stays on top when app is activated."""
-        super().changeEvent(event)
-        if event.type() == event.Type.WindowStateChange or event.type() == event.Type.ActivationChange:
-            # When window is activated or state changes, raise dialog above parent
-            if self.isVisible():
-                self._raise_above_parent()
-
-    def _raise_above_parent(self):
-        """Raise dialog above parent window."""
-        if self._parent_window:
-            # Raise parent first, then raise dialog above it
-            self._parent_window.raise_()
-            self._parent_window.activateWindow()
-            # Then raise and activate the dialog
-            self.raise_()
-            self.activateWindow()
-        else:
-            # No parent - just raise and activate
-            self.raise_()
-            self.activateWindow()

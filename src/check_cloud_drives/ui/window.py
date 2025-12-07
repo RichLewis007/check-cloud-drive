@@ -128,13 +128,6 @@ class MainWindow(QMainWindow):
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_all_drives)
         self.standard_button_height = None  # Will be set in _setup_ui
-        self.active_dialog = None  # Track active modal dialog for overlay management
-        self.overlay_sync_timer = QTimer()  # Timer to sync overlay with dialog visibility
-        self.overlay_sync_timer.timeout.connect(self._sync_overlay_with_dialog)
-        self.overlay_sync_timer.setInterval(100)  # Check every 100ms
-        self.dialog_raise_timer = QTimer()  # Timer to ensure dialog stays on top
-        self.dialog_raise_timer.timeout.connect(self._ensure_dialog_on_top)
-        self.dialog_raise_timer.setInterval(200)  # Check every 200ms
 
         self._setup_ui()
         self._setup_tray()
@@ -512,18 +505,10 @@ class MainWindow(QMainWindow):
         available_remotes = self._get_available_remotes()
         if available_remotes:
             drive_order = []  # Empty for first run
-            dialog = SetupDialog(available_remotes, [], drive_order, self)
-            self.active_dialog = dialog
             self._show_overlay()
-            # Connect overlay to dialog visibility and start sync timer
-            dialog.finished.connect(self._on_dialog_finished)
-            self.overlay_sync_timer.start()
-            self.dialog_raise_timer.start()
+            dialog = SetupDialog(available_remotes, [], drive_order, self)
             result = dialog.exec()
-            self.overlay_sync_timer.stop()
-            self.dialog_raise_timer.stop()
             self._hide_overlay()
-            self.active_dialog = None
             if result == QDialog.Accepted:
                 for drive_config in dialog.selected_drives:
                     self._add_drive_card(drive_config)
@@ -565,23 +550,28 @@ class MainWindow(QMainWindow):
             print(f"Error getting remotes: {e}")
         return []
 
+    def _get_current_drive_order(self) -> list[str]:
+        """Get the current order of drive cards from the UI layout."""
+        order = []
+        # The stretch is at the end, so iterate all items except the last one
+        for i in range(self.cards_layout.count() - 1):  # Exclude stretch at end
+            item = self.cards_layout.itemAt(i)
+            if item and item.widget():
+                card = item.widget()
+                if isinstance(card, DriveCard):
+                    order.append(card.drive_config.remote_name)
+        return order
+
     def _add_drive(self):
         """Add a new drive."""
         available_remotes = self._get_available_remotes()
         existing_drives = self.config_manager.get_drives()
-        drive_order = self.config_manager.get_drive_order()
-        dialog = SetupDialog(available_remotes, existing_drives, drive_order, self)
-        self.active_dialog = dialog
+        # Get current order from UI layout, not from config (to reflect any recent reordering)
+        drive_order = self._get_current_drive_order()
         self._show_overlay()
-        # Connect overlay to dialog visibility and start sync timer
-        dialog.finished.connect(self._on_dialog_finished)
-        self.overlay_sync_timer.start()
-        self.dialog_raise_timer.start()
+        dialog = SetupDialog(available_remotes, existing_drives, drive_order, self)
         result = dialog.exec()
-        self.overlay_sync_timer.stop()
-        self.dialog_raise_timer.stop()
         self._hide_overlay()
-        self.active_dialog = None
         if result == QDialog.Accepted:
             # Get list of selected remote names
             selected_remote_names = {d.remote_name for d in dialog.selected_drives}
@@ -686,18 +676,18 @@ class MainWindow(QMainWindow):
 
     def _save_drive_order(self):
         """Save the current order of drive cards."""
-        order = []
-        # The stretch is at the end, so iterate all items except the last one
-        for i in range(self.cards_layout.count() - 1):  # Exclude stretch at the end
-            item = self.cards_layout.itemAt(i)
-            if item and item.widget():
-                card = item.widget()
-                if isinstance(card, DriveCard):
-                    order.append(card.drive_config.remote_name)
+        order = self._get_current_drive_order()
         self.config_manager.set_drive_order(order)
 
     def reorder_cards(self, dragged_remote: str, target_remote: str):
-        """Reorder cards when one is dragged onto another."""
+        """Reorder cards when one is dragged onto another.
+        
+        Simple swap behavior: the dragged card and target card swap positions.
+        All other cards remain in their exact same positions.
+        
+        QVBoxLayout has no automatic ordering - it displays widgets in layout order.
+        We manually reorder by swapping the two cards' positions.
+        """
         if dragged_remote == target_remote:
             return
 
@@ -707,30 +697,34 @@ class MainWindow(QMainWindow):
         dragged_card = self.drive_cards[dragged_remote]
         target_card = self.drive_cards[target_remote]
 
-        # Get current positions (these indices account for the stretch at index 0)
+        # Get current positions in the layout
         dragged_index = self.cards_layout.indexOf(dragged_card)
         target_index = self.cards_layout.indexOf(target_card)
 
         if dragged_index == -1 or target_index == -1:
             return
 
-        # Remove dragged card first
-        self.cards_layout.removeWidget(dragged_card)
+        # Get all cards in current order (excluding stretch)
+        current_cards = []
+        for i in range(self.cards_layout.count() - 1):  # Exclude stretch at end
+            item = self.cards_layout.itemAt(i)
+            if item and item.widget():
+                card = item.widget()
+                if isinstance(card, DriveCard):
+                    current_cards.append(card)
 
-        # Calculate insert position
-        # After removing the dragged card, indices shift:
-        # - If moving down (dragged_index < target_index), target_index decreases by 1
-        # - If moving up (dragged_index > target_index), target_index stays the same
-        if dragged_index < target_index:
-            # Moving down - insert after target
-            # After removal, target is at (target_index - 1), so insert at target_index
-            insert_index = target_index
-        else:
-            # Moving up - insert before target (target_index unchanged after removal)
-            insert_index = target_index
+        # Simple swap: create new order list by swapping the two cards
+        new_order = current_cards.copy()
+        new_order[dragged_index] = target_card
+        new_order[target_index] = dragged_card
 
-        # Reinsert at the correct position
-        self.cards_layout.insertWidget(insert_index, dragged_card)
+        # Remove all cards from layout (keep the stretch)
+        for card in current_cards:
+            self.cards_layout.removeWidget(card)
+
+        # Reinsert cards in new order (before the stretch)
+        for card in new_order:
+            self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
 
         # Force layout update to ensure visual change
         self.cards_layout.update()
@@ -754,6 +748,9 @@ class MainWindow(QMainWindow):
         worker = RcloneWorker(["rclone", "about", remote_name + ":"], remote_name)
         worker.finished.connect(lambda rn, result: self._on_drive_update(rn, result, None))
         worker.error.connect(lambda rn, error: self._on_drive_update(rn, None, error))
+        # Clean up worker when it finishes (lambda ignores signal arguments)
+        worker.finished.connect(lambda rn, result: self._cleanup_worker(worker))
+        worker.error.connect(lambda rn, error: self._cleanup_worker(worker))
         worker.start()
         self.workers.append(worker)
 
@@ -781,6 +778,41 @@ class MainWindow(QMainWindow):
 
         card.update_status(status)
         self._save_drives()
+
+    def _cleanup_worker(self, worker: RcloneWorker):
+        """Remove worker from the list when it finishes."""
+        if worker in self.workers:
+            self.workers.remove(worker)
+        worker.deleteLater()
+
+    def _stop_all_workers(self):
+        """Stop all running workers and wait for them to finish."""
+        if not self.workers:
+            return
+        
+        # Wait briefly for workers to finish, then terminate if still running
+        # This allows quick exit while ensuring threads are cleaned up
+        import time
+        wait_timeout_ms = 2000  # Wait up to 2 seconds for normal completion
+        terminate_timeout_ms = 1000  # Wait 1 second after terminate
+        
+        for worker in self.workers[:]:  # Copy list to avoid modification during iteration
+            if worker.isRunning():
+                # Wait briefly for the worker to finish normally
+                worker.wait(wait_timeout_ms)
+                
+                # If still running, terminate it
+                if worker.isRunning():
+                    worker.terminate()
+                    worker.wait(terminate_timeout_ms)
+        
+        # Clean up all workers
+        for worker in self.workers[:]:
+            if worker.isRunning():
+                worker.terminate()
+                worker.wait(terminate_timeout_ms)
+            worker.deleteLater()
+        self.workers.clear()
 
     def _create_settings_page(self) -> QWidget:
         """Create the settings page widget."""
@@ -1244,54 +1276,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'overlay'):
             self.overlay.hide()
 
-    def _on_dialog_finished(self, result):
-        """Handle dialog finished - ensure overlay is hidden."""
-        self.overlay_sync_timer.stop()
-        self.dialog_raise_timer.stop()
-        self._hide_overlay()
-        self.active_dialog = None
-
-    def changeEvent(self, event):
-        """Handle window state changes to sync overlay with dialog visibility."""
-        super().changeEvent(event)
-        # On macOS, when switching apps, modal dialogs are hidden
-        # We need to sync overlay visibility with dialog visibility
-        if event.type() == event.Type.WindowStateChange:
-            self._sync_overlay_with_dialog()
-        elif event.type() == event.Type.ActivationChange:
-            self._sync_overlay_with_dialog()
-            # When window is activated, bring dialog to front
-            if self.isActiveWindow() and self.active_dialog:
-                self._bring_dialog_to_front()
-
-    def _sync_overlay_with_dialog(self):
-        """Sync overlay visibility with active dialog visibility."""
-        if self.active_dialog:
-            # Check if dialog is visible
-            if self.active_dialog.isVisible():
-                self._show_overlay()
-                # Ensure dialog is on top
-                self._bring_dialog_to_front()
-            else:
-                # Dialog is hidden (e.g., app switched) - hide overlay
-                self._hide_overlay()
-
-    def _bring_dialog_to_front(self):
-        """Bring the active dialog to the front above the main window."""
-        if self.active_dialog and self.active_dialog.isVisible():
-            # Raise the dialog above this window
-            self.active_dialog.raise_()
-            self.active_dialog.activateWindow()
-            # Ensure it's shown if it was hidden
-            if not self.active_dialog.isVisible():
-                self.active_dialog.show()
-    
-    def _ensure_dialog_on_top(self):
-        """Ensure dialog stays on top of main window - called periodically by timer."""
-        if self.active_dialog and self.active_dialog.isVisible() and self.isActiveWindow():
-            # Main window is active - ensure dialog is raised above it
-            self._bring_dialog_to_front()
-
     def resizeEvent(self, event):
         """Handle window resize to update overlay size."""
         super().resizeEvent(event)
@@ -1325,6 +1309,16 @@ class MainWindow(QMainWindow):
         self.config_manager.set_window_geometry(
             {"x": geo.x(), "y": geo.y(), "width": geo.width(), "height": geo.height()}
         )
+        
+        # Save drive order before closing/hiding
+        self._save_drive_order()
+        
+        # Stop all running worker threads before closing
+        self._stop_all_workers()
+        
+        # Stop refresh timer
+        if self.refresh_timer.isActive():
+            self.refresh_timer.stop()
 
         # Hide instead of close if tray is available
         if QSystemTrayIcon.isSystemTrayAvailable():

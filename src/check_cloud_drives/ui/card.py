@@ -178,6 +178,7 @@ class DriveCard(QFrame):
         # Store original content for drag preview restoration
         self._original_content_state = None
         self._preview_target_card = None  # Card showing preview content
+        self._dragged_remote_name = None  # Store dragged remote name for dragLeaveEvent
 
     def _setup_ui(self):
         """Set up the UI for the drive card."""
@@ -1114,6 +1115,8 @@ class DriveCard(QFrame):
         if event.mimeData().hasText() and event.mimeData().text() != self.drive_config.remote_name:
             event.acceptProposedAction()
             dragged_remote = event.mimeData().text()
+            # Store dragged remote name so we can access it in dragLeaveEvent
+            self._dragged_remote_name = dragged_remote
             
             # Find the card being dragged
             dragged_card = None
@@ -1207,8 +1210,8 @@ class DriveCard(QFrame):
         self.setStyleSheet(self._original_stylesheet)
         
         # Restore the dragged card's original content if it was showing preview
-        if event.mimeData().hasText():
-            dragged_remote = event.mimeData().text()
+        if self._dragged_remote_name:
+            dragged_remote = self._dragged_remote_name
             parent = self.parent()
             while parent:
                 if hasattr(parent, "drive_cards"):
@@ -1217,6 +1220,8 @@ class DriveCard(QFrame):
                         dragged_card._restore_content_state()
                     break
                 parent = parent.parent()
+            # Clear the stored dragged remote name
+            self._dragged_remote_name = None
 
     def dropEvent(self, event):
         """Handle drop event."""
@@ -1272,3 +1277,6 @@ class DriveCard(QFrame):
                         dragged_card._restore_content_state()
                     break
                 parent = parent.parent()
+        
+        # Clear the stored dragged remote name
+        self._dragged_remote_name = None
