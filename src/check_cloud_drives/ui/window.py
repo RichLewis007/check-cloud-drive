@@ -128,6 +128,10 @@ class MainWindow(QMainWindow):
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_all_drives)
         self.standard_button_height = None  # Will be set in _setup_ui
+        self.active_dialog = None  # Track active modal dialog for overlay management
+        self.overlay_sync_timer = QTimer()  # Timer to sync overlay with dialog visibility
+        self.overlay_sync_timer.timeout.connect(self._sync_overlay_with_dialog)
+        self.overlay_sync_timer.setInterval(100)  # Check every 100ms
 
         self._setup_ui()
         self._setup_tray()
@@ -505,10 +509,16 @@ class MainWindow(QMainWindow):
         available_remotes = self._get_available_remotes()
         if available_remotes:
             drive_order = []  # Empty for first run
-            self._show_overlay()
             dialog = SetupDialog(available_remotes, [], drive_order, self)
+            self.active_dialog = dialog
+            self._show_overlay()
+            # Connect overlay to dialog visibility and start sync timer
+            dialog.finished.connect(self._on_dialog_finished)
+            self.overlay_sync_timer.start()
             result = dialog.exec()
+            self.overlay_sync_timer.stop()
             self._hide_overlay()
+            self.active_dialog = None
             if result == QDialog.Accepted:
                 for drive_config in dialog.selected_drives:
                     self._add_drive_card(drive_config)
@@ -555,10 +565,16 @@ class MainWindow(QMainWindow):
         available_remotes = self._get_available_remotes()
         existing_drives = self.config_manager.get_drives()
         drive_order = self.config_manager.get_drive_order()
-        self._show_overlay()
         dialog = SetupDialog(available_remotes, existing_drives, drive_order, self)
+        self.active_dialog = dialog
+        self._show_overlay()
+        # Connect overlay to dialog visibility and start sync timer
+        dialog.finished.connect(self._on_dialog_finished)
+        self.overlay_sync_timer.start()
         result = dialog.exec()
+        self.overlay_sync_timer.stop()
         self._hide_overlay()
+        self.active_dialog = None
         if result == QDialog.Accepted:
             # Get list of selected remote names
             selected_remote_names = {d.remote_name for d in dialog.selected_drives}
@@ -1220,6 +1236,32 @@ class MainWindow(QMainWindow):
         """Hide the dimming overlay."""
         if hasattr(self, 'overlay'):
             self.overlay.hide()
+
+    def _on_dialog_finished(self, result):
+        """Handle dialog finished - ensure overlay is hidden."""
+        self.overlay_sync_timer.stop()
+        self._hide_overlay()
+        self.active_dialog = None
+
+    def changeEvent(self, event):
+        """Handle window state changes to sync overlay with dialog visibility."""
+        super().changeEvent(event)
+        # On macOS, when switching apps, modal dialogs are hidden
+        # We need to sync overlay visibility with dialog visibility
+        if event.type() == event.Type.WindowStateChange:
+            self._sync_overlay_with_dialog()
+        elif event.type() == event.Type.ActivationChange:
+            self._sync_overlay_with_dialog()
+
+    def _sync_overlay_with_dialog(self):
+        """Sync overlay visibility with active dialog visibility."""
+        if self.active_dialog:
+            # Check if dialog is visible
+            if self.active_dialog.isVisible():
+                self._show_overlay()
+            else:
+                # Dialog is hidden (e.g., app switched) - hide overlay
+                self._hide_overlay()
 
     def resizeEvent(self, event):
         """Handle window resize to update overlay size."""

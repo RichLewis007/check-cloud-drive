@@ -35,6 +35,9 @@ class SetupDialog(QDialog):
         self.removed_drives: list[str] = []  # Remotes that were unchecked
         self.setWindowTitle("Setup Cloud Drives")
         self.setWindowModality(Qt.ApplicationModal)  # Program modal - blocks entire application
+        # Set minimum size to make dialog taller
+        self.setMinimumSize(500, 600)
+        self.resize(500, 600)
         self._setup_ui()
 
     def _setup_ui(self):
@@ -110,6 +113,9 @@ class SetupDialog(QDialog):
                 self.remotes_list.addItem(item)
         
         layout.addWidget(self.remotes_list)
+        
+        # Set minimum height for the list widget to make it taller
+        self.remotes_list.setMinimumHeight(300)
 
         # Standard button styling (font, size, padding) - define early for reuse
         standard_button_style = """
