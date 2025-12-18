@@ -1,4 +1,7 @@
-"""Data models for cloud drive configuration and status."""
+"""Data models for cloud drive configuration and status.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 from dataclasses import asdict, dataclass
 

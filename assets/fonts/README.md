@@ -1,5 +1,7 @@
 # Fonts Directory
 
+**Author:** Rich Lewis - @RichLewis007
+
 This directory contains bundled font files for the application.
 
 ## Font File

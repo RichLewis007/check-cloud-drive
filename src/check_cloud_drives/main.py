@@ -1,4 +1,7 @@
-"""Main entry point for the application."""
+"""Main entry point for the application.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 import sys
 from pathlib import Path

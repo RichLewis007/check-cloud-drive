@@ -1,4 +1,7 @@
-"""Configuration management for the application."""
+"""Configuration management for the application.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 from pathlib import Path
 

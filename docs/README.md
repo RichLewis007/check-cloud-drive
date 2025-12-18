@@ -1,5 +1,7 @@
 # Documentation
 
+**Author:** Rich Lewis - @RichLewis007
+
 This directory contains the static HTML files for the GitHub Pages site.
 
 The main page is `index.html`, which provides documentation and information about the Check Cloud Drives application.

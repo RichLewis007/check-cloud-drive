@@ -1,4 +1,7 @@
-"""Rclone command execution and parsing."""
+"""Rclone command execution and parsing.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 import subprocess
 

@@ -1,4 +1,7 @@
-"""Main application window."""
+"""Main application window.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 import platform
 import subprocess

@@ -1,4 +1,7 @@
-"""Font loading utilities for bundled fonts."""
+"""Font loading utilities for bundled fonts.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 import atexit
 import zipfile

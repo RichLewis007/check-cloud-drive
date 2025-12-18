@@ -1,4 +1,7 @@
-"""Dialog components for the application."""
+"""Dialog components for the application.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 import subprocess
 

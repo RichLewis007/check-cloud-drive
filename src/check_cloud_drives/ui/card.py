@@ -1,4 +1,7 @@
-"""Drive card UI component."""
+"""Drive card UI component.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 import re
 from datetime import datetime

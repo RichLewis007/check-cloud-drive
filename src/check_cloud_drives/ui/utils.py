@@ -1,4 +1,7 @@
-"""Utility functions for UI components."""
+"""Utility functions for UI components.
+
+Author: Rich Lewis - @RichLewis007
+"""
 
 from pathlib import Path
 

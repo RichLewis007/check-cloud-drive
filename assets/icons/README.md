@@ -1,5 +1,7 @@
 # Icons Directory
 
+**Author:** Rich Lewis - @RichLewis007
+
 Place your SVG icon files here. The app will automatically load them based on the drive type.
 
 ## Supported Icon Names

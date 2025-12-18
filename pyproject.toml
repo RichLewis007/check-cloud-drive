@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A PySide6 GUI application for monitoring cloud drive status via rclone"
 readme = "README.md"
 authors = [
-    {name = "Rich Lewis"}
+    {name = "Rich Lewis", email = "", github = "@RichLewis007"}
 ]
 requires-python = ">=3.11"
 dependencies = [
