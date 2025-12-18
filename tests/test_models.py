@@ -1,7 +1,5 @@
 """Tests for data models (DriveConfig and DriveStatus)."""
 
-import pytest
-
 from check_cloud_drives.models import DriveConfig, DriveStatus
 
 
@@ -231,4 +229,3 @@ class TestDriveStatus:
         assert status1.total == "100 GB"
         assert status2.total == "1 TB"
         assert status3.total == "50 MB"
-

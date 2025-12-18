@@ -4,7 +4,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from check_cloud_drives.models import DriveConfig, DriveStatus
+from check_cloud_drives.models import DriveStatus
 from check_cloud_drives.ui.card import DriveCard
 
 
@@ -76,7 +76,7 @@ class TestDriveCard:
         """Test entering edit mode."""
         drive_card.show()  # Widget must be shown for visibility to work
         qtbot.waitExposed(drive_card)
-        
+
         assert drive_card.is_edit_mode is False
         drive_card._enter_edit_mode()
         qtbot.wait(100)  # Wait for layout updates
@@ -91,7 +91,7 @@ class TestDriveCard:
         """Test exiting edit mode."""
         drive_card.show()  # Widget must be shown for visibility to work
         qtbot.waitExposed(drive_card)
-        
+
         drive_card._enter_edit_mode()
         qtbot.wait(100)
         assert drive_card.is_edit_mode is True
@@ -197,7 +197,7 @@ class TestDriveCard:
         """Test updating drive status."""
         drive_card.show()  # Widget must be shown for visibility to work
         qtbot.waitExposed(drive_card)
-        
+
         drive_card.update_status(sample_drive_status)
         qtbot.wait(100)  # Wait for UI updates
 
@@ -206,7 +206,10 @@ class TestDriveCard:
         if sample_drive_status.free and sample_drive_status.free != "Unknown":
             assert drive_card.free_space_label.isVisible() is True
             # Check that free space is displayed
-            assert sample_drive_status.free in drive_card.free_space_label.text() or "Free:" in drive_card.free_space_label.text()
+            assert (
+                sample_drive_status.free in drive_card.free_space_label.text()
+                or "Free:" in drive_card.free_space_label.text()
+            )
 
     def test_update_status_with_error(self, drive_card):
         """Test updating drive status with error."""
@@ -235,7 +238,6 @@ class TestDriveCard:
         """Test that entering edit mode preserves card height."""
         # Show the card to get a real height
         drive_card.show()
-        original_height = drive_card.height()
 
         drive_card._enter_edit_mode()
         # Height should be fixed and similar to original
@@ -249,10 +251,10 @@ class TestDriveCard:
         """Test that title edit gets focus when entering edit mode."""
         drive_card.show()  # Widget must be shown for focus to work
         qtbot.waitExposed(drive_card)
-        
+
         drive_card._enter_edit_mode()
         qtbot.wait(100)  # Wait for focus to be set
-        
+
         # Focus might not be set immediately, but title_edit should exist and be in edit mode
         assert drive_card.title_edit is not None
         assert drive_card.is_edit_mode is True
@@ -297,4 +299,3 @@ class TestDriveCard:
         displayed = drive_card.display_name_label.text()
         assert displayed is not None
         assert len(displayed) > 0
-

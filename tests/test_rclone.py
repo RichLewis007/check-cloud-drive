@@ -1,8 +1,5 @@
 """Tests for rclone integration."""
 
-import subprocess
-from unittest.mock import MagicMock, patch
-
 import pytest
 
 from check_cloud_drives.rclone import RcloneWorker
@@ -209,4 +206,3 @@ Free:      50 GB
         assert result["total"].strip() == "100 GB"
         assert result["used"].strip() == "50 GB"
         assert result["free"].strip() == "50 GB"
-

@@ -6,11 +6,20 @@ Author: Rich Lewis - @RichLewis007
 import re
 from datetime import datetime
 
-from PySide6.QtCore import Property, QEasingCurve, QMimeData, QPoint, QPropertyAnimation, Qt, QRect, QSize, QTimer, Signal
+from PySide6.QtCore import (
+    Property,
+    QEasingCurve,
+    QMimeData,
+    QPoint,
+    QPropertyAnimation,
+    QRect,
+    Qt,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import QColor, QDrag, QFontMetrics, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
-    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -152,7 +161,7 @@ class LoadingSpinner(QWidget):
 
 class DriveCard(QFrame):
     """Widget representing a single cloud drive card."""
-    
+
     # Signal emitted when display name is saved
     display_name_saved = Signal(str)  # Emits the new display name
     # Signal emitted when card should be removed
@@ -222,7 +231,7 @@ class DriveCard(QFrame):
 
         # Set maximum width for the card to prevent it from becoming too wide
         self.setMaximumWidth(400)  # Reasonable maximum width for cards
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)  # Remove default layout margins
         layout.setSpacing(4)
@@ -230,19 +239,19 @@ class DriveCard(QFrame):
         # Header with icon on left and title next to it
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)  # Remove default layout margins
-        
+
         # Icon (will load SVG if available, otherwise placeholder)
         # Icon stays visible in both normal and edit mode
         icon_label = QLabel()
         icon_base_size = 52  # Base size for visibility without being too large
         icon_pixmap, aspect_ratio = load_icon(self.drive_config.drive_type, size=icon_base_size)
-        
+
         # Calculate dimensions based on aspect ratio
         # The load_icon function already returns a pixmap with correct aspect ratio
         # We just need to match the label size to the pixmap size
         icon_width = icon_pixmap.width()
         icon_height = icon_pixmap.height()
-        
+
         # Limit icon width to prevent cards from becoming too wide
         # Maximum icon width should be reasonable (e.g., 70px for wide icons)
         max_icon_width = 70
@@ -255,7 +264,7 @@ class DriveCard(QFrame):
             icon_pixmap = icon_pixmap.scaled(
                 icon_width, icon_height, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-        
+
         icon_label.setFixedSize(icon_width, icon_height)
         icon_label.setMinimumSize(icon_width, icon_height)
         icon_label.setAlignment(Qt.AlignCenter)
@@ -277,11 +286,13 @@ class DriveCard(QFrame):
 
         # Icon on the left (always visible) - align to top
         header_layout.addWidget(icon_label, 0, Qt.AlignTop)
-        
+
         # Name and remote name labels - next to icon (hidden in edit mode)
         name_layout = QVBoxLayout()
         name_layout.setContentsMargins(0, 0, 0, 0)  # Remove default layout margins
-        name_layout.setSpacing(8)  # Increased spacing to accommodate 2-line title and move Remote line down
+        name_layout.setSpacing(
+            8
+        )  # Increased spacing to accommodate 2-line title and move Remote line down
         # Display name as non-editable title label (can wrap to 2 lines, then truncate)
         self.display_name_label = QLabel(self.drive_config.display_name)
         self.display_name_label.setStyleSheet("""
@@ -311,25 +322,25 @@ class DriveCard(QFrame):
         two_line_height = int(line_spacing * 2.0)  # Generous space for 2 lines
         # Store max_height for truncation logic
         self._title_max_height = two_line_height
-        
+
         # CRITICAL: QLabel word wrap requires a fixed or maximum width to work
         # Calculate available width: card max (400) - icon (70) - padding (30) = ~300px
         # We'll update this dynamically after layout, but set an initial value
         initial_width = 300
         self.display_name_label.setMaximumWidth(initial_width)
-        
-        # Set size policy: Fixed/Preferred horizontally (width constrained), 
+
+        # Set size policy: Fixed/Preferred horizontally (width constrained),
         # MinimumExpanding vertically (can grow to show 2 lines)
         policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
         policy.setHeightForWidth(False)  # Don't adjust height based on width
         self.display_name_label.setSizePolicy(policy)
-        
+
         # Set minimum height for 1 line, maximum for 2 lines
         self.display_name_label.setMinimumHeight(single_line_height)
         self.display_name_label.setMaximumHeight(two_line_height)
-        
+
         name_layout.addWidget(self.display_name_label, 1)  # Add stretch factor so it expands
-        
+
         # Set initial display name (will be updated on resize if needed)
         # Use a timer to update after layout is complete
         QTimer.singleShot(100, lambda: self.update_display_name(self.drive_config.display_name))
@@ -351,20 +362,20 @@ class DriveCard(QFrame):
             }
         """)
         self.remote_name_label.setAlignment(Qt.AlignLeft)
-        
+
         # Wrap name_layout in a widget container for easier show/hide
         name_container = QWidget()
         name_container.setLayout(name_layout)
         self.name_container = name_container
-        
+
         # Add name container to header, with stretch to take remaining space
         header_layout.addWidget(name_container, 1)
         header_layout.addStretch()  # Push everything to the left
-        
+
         # Store header_layout reference for edit mode swapping
         self.header_layout = header_layout
         self.name_layout = name_layout
-        
+
         # Wrap header_layout in a widget for easier show/hide
         header_widget = QWidget()
         header_widget.setLayout(header_layout)
@@ -442,15 +453,15 @@ class DriveCard(QFrame):
         settings_button.clicked.connect(self._enter_edit_mode)
         self.settings_button = settings_button
         bottom_layout.addWidget(settings_button)
-        
+
         # Store reference to update_spacer so we can show/hide the indicator on it
         self.update_spacer = update_spacer
 
         layout.addLayout(bottom_layout)
-        
+
         # Remote name at the very bottom of the card
         layout.addWidget(self.remote_name_label)
-        
+
         # Store references to widgets that need to be hidden in edit mode
         # Note: icon_label stays visible in edit mode
         self.normal_mode_widgets = [
@@ -463,10 +474,10 @@ class DriveCard(QFrame):
             self.update_indicator,
             settings_button,
         ]
-        
+
         # Create edit mode UI (initially hidden)
         self._create_edit_mode_ui(layout)
-    
+
     def _create_edit_mode_ui(self, main_layout):
         """Create the edit mode UI elements."""
         # Edit mode container (initially hidden)
@@ -475,7 +486,7 @@ class DriveCard(QFrame):
         edit_layout = QVBoxLayout(self.edit_mode_container)
         edit_layout.setContentsMargins(0, 0, 0, 0)
         edit_layout.setSpacing(8)
-        
+
         # Title edit field (3 lines, fills card width)
         # Icon is already visible in header_layout above at top left
         self.title_edit = QTextEdit()
@@ -503,10 +514,10 @@ class DriveCard(QFrame):
         font.setBold(True)
         font.setFamily("AtkynsonMono Nerd Font Propo")
         self.title_edit.setFont(font)
-        
+
         # Remove document margins to get accurate line height
         self.title_edit.document().setDocumentMargin(0)
-        
+
         # Use QFontMetrics to get exact line height
         metrics = QFontMetrics(font)
         # height() gives the height of a single line of text
@@ -523,13 +534,14 @@ class DriveCard(QFrame):
         # Limit to 3 lines by setting maximum block count
         self.title_edit.document().setMaximumBlockCount(3)
         edit_layout.addWidget(self.title_edit, 1)  # Stretch factor 1 to fill available space
-        
+
         # Buttons at bottom, centered
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
-        
+
         # Create a reference button to get standard height (matching dialog buttons)
         from PySide6.QtWidgets import QPushButton as RefButton
+
         ref_button = RefButton("Cancel")
         ref_button.setStyleSheet("""
             QPushButton {
@@ -541,7 +553,7 @@ class DriveCard(QFrame):
         """)
         standard_button_height = ref_button.sizeHint().height()
         ref_button.deleteLater()
-        
+
         # Cancel button (to the left of Save)
         cancel_button = QPushButton("Cancel")
         cancel_button.setFixedHeight(standard_button_height)
@@ -565,7 +577,7 @@ class DriveCard(QFrame):
         """)
         cancel_button.clicked.connect(self._cancel_edit)
         buttons_layout.addWidget(cancel_button)
-        
+
         # Save button (green) - same height as Cancel
         save_button = QPushButton("Save")
         save_button.setFixedHeight(standard_button_height)
@@ -589,14 +601,14 @@ class DriveCard(QFrame):
         """)
         save_button.clicked.connect(self._save_edit)
         buttons_layout.addWidget(save_button)
-        
+
         buttons_layout.addStretch()
         edit_layout.addLayout(buttons_layout)
-        
+
         # Remove Remote button (red, below Save/Cancel)
         remove_button_layout = QHBoxLayout()
         remove_button_layout.addStretch()
-        
+
         remove_button = QPushButton("Remove Remote")
         # Match Save/Cancel button height, but allow width to fit text
         remove_button.setFixedHeight(standard_button_height)
@@ -620,37 +632,37 @@ class DriveCard(QFrame):
         """)
         remove_button.clicked.connect(self._remove_card)
         remove_button_layout.addWidget(remove_button)
-        
+
         remove_button_layout.addStretch()
         edit_layout.addLayout(remove_button_layout)
-        
+
         # Edit mode container is not added to layout yet
         # It will be inserted into header_layout when entering edit mode
         self.edit_mode_container.hide()
-    
+
     def _enter_edit_mode(self):
         """Enter edit mode - hide normal widgets, show edit widgets."""
         if self.is_edit_mode:
             return
-        
+
         self.is_edit_mode = True
-        
+
         # Store current height and set fixed height to prevent resizing
         current_height = self.sizeHint().height()
         if current_height <= 0:
             current_height = self.height()
         if current_height > 0:
             self.setFixedHeight(current_height)
-        
+
         # Hide name labels (icon stays visible)
         self.display_name_label.hide()
         self.remote_name_label.hide()
-        
+
         # Hide other normal mode widgets (status, info, bottom section)
         for widget in self.normal_mode_widgets:
             if widget not in [self.display_name_label, self.remote_name_label]:
                 widget.hide()
-        
+
         # Hide name container (icon stays visible in header_layout)
         self.name_container.hide()
         # Add edit_mode_container to main layout (after header_layout which contains icon)
@@ -662,7 +674,7 @@ class DriveCard(QFrame):
             if item and item.widget() == self.header_layout_widget:
                 header_index = i
                 break
-        
+
         if header_index >= 0:
             # Insert edit_mode_container right after header_layout_widget
             main_layout.insertWidget(header_index + 1, self.edit_mode_container, 1)
@@ -670,23 +682,23 @@ class DriveCard(QFrame):
             # Fallback: add at the beginning
             main_layout.insertWidget(0, self.edit_mode_container, 1)
         self.edit_mode_container.show()
-        
+
         # Set the title edit text
         self.title_edit.setPlainText(self.drive_config.display_name)
         self.title_edit.setFocus()
         self.title_edit.selectAll()
-    
+
     def _exit_edit_mode(self):
         """Exit edit mode - show normal widgets, hide edit widgets."""
         if not self.is_edit_mode:
             return
-        
+
         self.is_edit_mode = False
-        
+
         # Restore height constraints - allow card to resize naturally
         self.setMinimumHeight(0)
         self.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX equivalent
-        
+
         # Hide edit container and show header_layout_widget again
         main_layout = self.layout()
         edit_container_index = -1
@@ -695,68 +707,68 @@ class DriveCard(QFrame):
             if item and item.widget() == self.edit_mode_container:
                 edit_container_index = i
                 break
-        
+
         if edit_container_index >= 0:
             # Remove edit_mode_container from main layout
             main_layout.removeWidget(self.edit_mode_container)
             self.edit_mode_container.hide()
-        
+
         # Show header_layout_widget again (icon stays visible)
-        if hasattr(self, 'header_layout_widget') and self.header_layout_widget:
+        if hasattr(self, "header_layout_widget") and self.header_layout_widget:
             self.header_layout_widget.show()
-        
+
         # Show name container (it's still in the layout, just was hidden)
         self.name_container.show()
-        
+
         # Show name labels
         self.display_name_label.show()
         self.remote_name_label.show()
-        
+
         # Show all other normal mode widgets
         for widget in self.normal_mode_widgets:
             if widget not in [self.display_name_label, self.remote_name_label]:
                 widget.setVisible(True)
-    
+
     def _save_edit(self):
         """Save the edited title."""
         new_title = self.title_edit.toPlainText().strip()
         if not new_title:
             # Don't allow empty titles
             return
-        
+
         # Update the drive config
         self.drive_config.display_name = new_title
-        
+
         # Update the display label (will be truncated if needed)
         self.update_display_name(new_title)
-        
+
         # Emit signal to notify parent to save config
         self.display_name_saved.emit(new_title)
-        
+
         # Exit edit mode
         self._exit_edit_mode()
-    
+
     def _remove_card(self):
         """Remove the card from the list."""
         # Emit signal to remove the card
         self.card_removed.emit()
         # Exit edit mode (card will be removed by parent)
         self._exit_edit_mode()
-    
+
     def _cancel_edit(self):
         """Cancel editing and exit edit mode."""
         # Restore original text
         self.title_edit.setPlainText(self.drive_config.display_name)
-        
+
         # Exit edit mode
         self._exit_edit_mode()
 
     def _update_label_width(self):
         """Update the label's maximum width based on available space and force word wrap."""
-        if hasattr(self, 'display_name_label') and hasattr(self, 'icon_label'):
+        if hasattr(self, "display_name_label") and hasattr(self, "icon_label"):
             # Get actual card width
             card_width = self.width() if self.width() > 0 else 400
-            icon_width = self.icon_label.width() if hasattr(self, 'icon_label') else 70
+            icon_width = self.icon_label.width() if hasattr(self, "icon_label") else 70
             # Calculate available width: card width - icon - padding/margins
             available_width = card_width - icon_width - 30  # Padding and margins
             if available_width > 0:
@@ -768,7 +780,7 @@ class DriveCard(QFrame):
                     # Re-set the text to force word wrap recalculation
                     self.display_name_label.setText("")  # Clear first
                     QTimer.singleShot(10, lambda: self.display_name_label.setText(current_text))
-    
+
     def update_display_name(self, name: str):
         """Update the display name label with truncation for 2 lines."""
         self.drive_config.display_name = name
@@ -776,20 +788,20 @@ class DriveCard(QFrame):
         font = self.display_name_label.font()
         metrics = QFontMetrics(font)
         # Use the stored max height from initialization
-        max_height = getattr(self, '_title_max_height', None)
+        max_height = getattr(self, "_title_max_height", None)
         if max_height is None:
             # Fallback calculation if not set
             line_spacing = metrics.lineSpacing()
             max_height = int(line_spacing * 2.0)
-        
+
         # Get available width (card width minus icon and padding)
         # Use a reasonable estimate if card width not yet set
         card_width = self.width() if self.width() > 0 else 400
-        icon_width = self.icon_label.width() if hasattr(self, 'icon_label') else 70
+        icon_width = self.icon_label.width() if hasattr(self, "icon_label") else 70
         available_width = card_width - icon_width - 30  # Padding and margins
         if available_width <= 0:
             available_width = 300  # Fallback width
-        
+
         # Try to manually split text into 2 lines for better control
         # Split on words and try to create 2 balanced lines
         words = name.split()
@@ -798,23 +810,25 @@ class DriveCard(QFrame):
             mid_point = len(words) // 2
             line1 = " ".join(words[:mid_point])
             line2 = " ".join(words[mid_point:])
-            
+
             # Check if this fits in 2 lines (without word wrap flag for manual line breaks)
             test_text = f"{line1}\n{line2}"
-            test_rect = metrics.boundingRect(QRect(0, 0, available_width, 10000),
-                                            Qt.AlignLeft | Qt.AlignTop, test_text)
-            
+            test_rect = metrics.boundingRect(
+                QRect(0, 0, available_width, 10000), Qt.AlignLeft | Qt.AlignTop, test_text
+            )
+
             if test_rect.height() <= max_height:
                 # It fits, use the 2-line version with explicit line break
                 self.display_name_label.setText(test_text)
                 self.display_name_label.setToolTip(name)  # Show full text on hover
                 return
-        
+
         # If manual split doesn't work or text is too short, use word wrap
         # Calculate how many lines the text would take with word wrapping
-        text_rect = metrics.boundingRect(QRect(0, 0, available_width, 10000), 
-                                         Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop, name)
-        
+        text_rect = metrics.boundingRect(
+            QRect(0, 0, available_width, 10000), Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop, name
+        )
+
         # Only truncate if text exceeds 2 lines (max_height)
         if text_rect.height() > max_height:
             # Text exceeds 2 lines, need to truncate
@@ -822,18 +836,21 @@ class DriveCard(QFrame):
             low = 0
             high = len(name)
             best_text = name
-            
+
             while low < high:
                 mid = (low + high + 1) // 2
                 test_text = name[:mid] + "..."
-                test_rect = metrics.boundingRect(QRect(0, 0, available_width, max_height * 10),
-                                                Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop, test_text)
+                test_rect = metrics.boundingRect(
+                    QRect(0, 0, available_width, max_height * 10),
+                    Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop,
+                    test_text,
+                )
                 if test_rect.height() <= max_height:
                     best_text = test_text
                     low = mid
                 else:
                     high = mid - 1
-            
+
             self.display_name_label.setText(best_text)
             self.display_name_label.setToolTip(name)  # Show full text on hover
         else:
@@ -844,9 +861,9 @@ class DriveCard(QFrame):
         """Handle resize event to update title truncation."""
         super().resizeEvent(event)
         # Update display name truncation when card is resized
-        if hasattr(self, 'display_name_label') and self.drive_config.display_name:
+        if hasattr(self, "display_name_label") and self.drive_config.display_name:
             self.update_display_name(self.drive_config.display_name)
-    
+
     def update_remote_name(self, remote_name: str):
         """Update the remote name label."""
         self.drive_config.remote_name = remote_name
@@ -881,21 +898,23 @@ class DriveCard(QFrame):
                 info_text += f"\nObjects: {status.objects}"
 
             self.info_label.setText(info_text)
-            
+
             # Extract and display free space value at bottom center
             # Extract just the number/value after "Free: " and format to one decimal place
             free_value = status.free
             if free_value and free_value != "Unknown":
                 # Parse the value (e.g., "123.456 GB" -> "123.5 GB")
                 # Match number with optional decimals and unit
-                match = re.match(r'([\d.]+)\s*([A-Za-z]+)?', free_value)
+                match = re.match(r"([\d.]+)\s*([A-Za-z]+)?", free_value)
                 if match:
                     number_str = match.group(1)
                     unit = match.group(2) if match.group(2) else ""
                     try:
                         number = float(number_str)
                         formatted_number = f"{number:.1f}"
-                        formatted_value = f"{formatted_number} {unit}".strip() if unit else formatted_number
+                        formatted_value = (
+                            f"{formatted_number} {unit}".strip() if unit else formatted_number
+                        )
                         self.free_space_label.setText(f"Free: {formatted_value}")
                         self.free_space_label.show()
                     except ValueError:
@@ -996,119 +1015,125 @@ class DriveCard(QFrame):
     def _store_content_state(self):
         """Store the current card's content state for restoration."""
         state = {
-            'display_name': self.drive_config.display_name,
-            'status_text': self.status_label.text() if hasattr(self, 'status_label') else '',
-            'status_style': self.status_label.styleSheet() if hasattr(self, 'status_label') else '',
-            'info_text': self.info_label.text() if hasattr(self, 'info_label') else '',
-            'free_space_text': self.free_space_label.text() if hasattr(self, 'free_space_label') else '',
-            'free_space_visible': self.free_space_label.isVisible() if hasattr(self, 'free_space_label') else False,
-            'remote_name': self.drive_config.remote_name,
-            'icon_pixmap': self.icon_label.pixmap() if hasattr(self, 'icon_label') and self.icon_label.pixmap() else None,
-            'drive_status': self.drive_status,
-            'is_updating': self.is_updating,
-            'last_updated_str': self.last_updated_str,
+            "display_name": self.drive_config.display_name,
+            "status_text": self.status_label.text() if hasattr(self, "status_label") else "",
+            "status_style": self.status_label.styleSheet() if hasattr(self, "status_label") else "",
+            "info_text": self.info_label.text() if hasattr(self, "info_label") else "",
+            "free_space_text": self.free_space_label.text()
+            if hasattr(self, "free_space_label")
+            else "",
+            "free_space_visible": self.free_space_label.isVisible()
+            if hasattr(self, "free_space_label")
+            else False,
+            "remote_name": self.drive_config.remote_name,
+            "icon_pixmap": self.icon_label.pixmap()
+            if hasattr(self, "icon_label") and self.icon_label.pixmap()
+            else None,
+            "drive_status": self.drive_status,
+            "is_updating": self.is_updating,
+            "last_updated_str": self.last_updated_str,
         }
         return state
-    
+
     def _copy_content_from(self, source_card):
         """Copy content from another card to this card."""
         if not source_card:
             return
-        
+
         # Store original state if not already stored
         if self._original_content_state is None:
             self._original_content_state = self._store_content_state()
-        
+
         # Copy display name
         self.drive_config.display_name = source_card.drive_config.display_name
         self.update_display_name(source_card.drive_config.display_name)
-        
+
         # Copy status
-        if hasattr(source_card, 'status_label') and hasattr(self, 'status_label'):
+        if hasattr(source_card, "status_label") and hasattr(self, "status_label"):
             self.status_label.setText(source_card.status_label.text())
             self.status_label.setStyleSheet(source_card.status_label.styleSheet())
-        
+
         # Copy info
-        if hasattr(source_card, 'info_label') and hasattr(self, 'info_label'):
+        if hasattr(source_card, "info_label") and hasattr(self, "info_label"):
             self.info_label.setText(source_card.info_label.text())
-        
+
         # Copy free space
-        if hasattr(source_card, 'free_space_label') and hasattr(self, 'free_space_label'):
+        if hasattr(source_card, "free_space_label") and hasattr(self, "free_space_label"):
             self.free_space_label.setText(source_card.free_space_label.text())
             if source_card.free_space_label.isVisible():
                 self.free_space_label.show()
             else:
                 self.free_space_label.hide()
-        
+
         # Copy remote name
         self.drive_config.remote_name = source_card.drive_config.remote_name
-        if hasattr(source_card, 'remote_name_label') and hasattr(self, 'remote_name_label'):
+        if hasattr(source_card, "remote_name_label") and hasattr(self, "remote_name_label"):
             self.remote_name_label.setText(source_card.remote_name_label.text())
-        
+
         # Copy icon
-        if hasattr(source_card, 'icon_label') and hasattr(self, 'icon_label'):
+        if hasattr(source_card, "icon_label") and hasattr(self, "icon_label"):
             if source_card.icon_label.pixmap():
                 self.icon_label.setPixmap(source_card.icon_label.pixmap())
-        
+
         # Copy status object
         self.drive_status = source_card.drive_status
         self.is_updating = source_card.is_updating
         self.last_updated_str = source_card.last_updated_str
-        
+
         # Update update indicator
         if source_card.is_updating:
             self.set_updating(True)
         else:
             self.set_updating(False)
-    
+
     def _restore_content_state(self):
         """Restore the card's original content state."""
         if self._original_content_state is None:
             return
-        
+
         state = self._original_content_state
-        
+
         # Restore display name
-        self.drive_config.display_name = state['display_name']
-        self.update_display_name(state['display_name'])
-        
+        self.drive_config.display_name = state["display_name"]
+        self.update_display_name(state["display_name"])
+
         # Restore status
-        if hasattr(self, 'status_label'):
-            self.status_label.setText(state['status_text'])
-            self.status_label.setStyleSheet(state['status_style'])
-        
+        if hasattr(self, "status_label"):
+            self.status_label.setText(state["status_text"])
+            self.status_label.setStyleSheet(state["status_style"])
+
         # Restore info
-        if hasattr(self, 'info_label'):
-            self.info_label.setText(state['info_text'])
-        
+        if hasattr(self, "info_label"):
+            self.info_label.setText(state["info_text"])
+
         # Restore free space
-        if hasattr(self, 'free_space_label'):
-            self.free_space_label.setText(state['free_space_text'])
-            if state['free_space_visible']:
+        if hasattr(self, "free_space_label"):
+            self.free_space_label.setText(state["free_space_text"])
+            if state["free_space_visible"]:
                 self.free_space_label.show()
             else:
                 self.free_space_label.hide()
-        
+
         # Restore remote name
-        self.drive_config.remote_name = state['remote_name']
-        if hasattr(self, 'remote_name_label'):
+        self.drive_config.remote_name = state["remote_name"]
+        if hasattr(self, "remote_name_label"):
             self.remote_name_label.setText(f"Remote: {state['remote_name']}")
-        
+
         # Restore icon
-        if hasattr(self, 'icon_label') and state['icon_pixmap']:
-            self.icon_label.setPixmap(state['icon_pixmap'])
-        
+        if hasattr(self, "icon_label") and state["icon_pixmap"]:
+            self.icon_label.setPixmap(state["icon_pixmap"])
+
         # Restore status object
-        self.drive_status = state['drive_status']
-        self.is_updating = state['is_updating']
-        self.last_updated_str = state.get('last_updated_str')
-        
+        self.drive_status = state["drive_status"]
+        self.is_updating = state["is_updating"]
+        self.last_updated_str = state.get("last_updated_str")
+
         # Restore update indicator
-        if state['is_updating']:
+        if state["is_updating"]:
             self.set_updating(True)
         else:
             self.set_updating(False)
-        
+
         # Clear stored state
         self._original_content_state = None
         self._preview_target_card = None
@@ -1120,7 +1145,7 @@ class DriveCard(QFrame):
             dragged_remote = event.mimeData().text()
             # Store dragged remote name so we can access it in dragLeaveEvent
             self._dragged_remote_name = dragged_remote
-            
+
             # Find the card being dragged
             dragged_card = None
             parent = self.parent()
@@ -1129,16 +1154,16 @@ class DriveCard(QFrame):
                     dragged_card = parent.drive_cards.get(dragged_remote)
                     break
                 parent = parent.parent()
-            
+
             if dragged_card:
                 # Store the dragged card's original content if not already stored
                 if dragged_card._original_content_state is None:
                     dragged_card._original_content_state = dragged_card._store_content_state()
                     dragged_card._preview_target_card = self
-                
+
                 # Copy this card's content to the dragged card (preview)
                 dragged_card._copy_content_from(self)
-            
+
             # Store current height and set fixed height to maintain card size (like edit mode)
             current_height = self.sizeHint().height()
             if current_height <= 0:
@@ -1146,29 +1171,29 @@ class DriveCard(QFrame):
             if current_height > 0:
                 self._drag_over_height = current_height
                 self.setFixedHeight(current_height)
-            
+
             # Hide all content widgets (like edit mode does)
-            if hasattr(self, 'icon_label'):
+            if hasattr(self, "icon_label"):
                 self.icon_label.hide()
-            if hasattr(self, 'header_layout_widget'):
+            if hasattr(self, "header_layout_widget"):
                 self.header_layout_widget.hide()
-            if hasattr(self, 'status_label'):
+            if hasattr(self, "status_label"):
                 self.status_label.hide()
-            if hasattr(self, 'info_label'):
+            if hasattr(self, "info_label"):
                 self.info_label.hide()
-            if hasattr(self, 'free_space_label'):
+            if hasattr(self, "free_space_label"):
                 self.free_space_label.hide()
-            if hasattr(self, 'settings_button'):
+            if hasattr(self, "settings_button"):
                 self.settings_button.hide()
-            if hasattr(self, 'update_spacer'):
+            if hasattr(self, "update_spacer"):
                 self.update_spacer.hide()
-            if hasattr(self, 'remote_name_label'):
+            if hasattr(self, "remote_name_label"):
                 self.remote_name_label.hide()
-            if hasattr(self, 'update_indicator'):
+            if hasattr(self, "update_indicator"):
                 self.update_indicator.hide()
-            if hasattr(self, 'name_container'):
+            if hasattr(self, "name_container"):
                 self.name_container.hide()
-            
+
             # Set grey background to show it's a drop target
         self.setStyleSheet("""
             QFrame {
@@ -1187,31 +1212,31 @@ class DriveCard(QFrame):
         self.setMinimumHeight(0)
         self.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX equivalent
         self._drag_over_height = None
-        
+
         # Restore original appearance - show all content and restore stylesheet
-        if hasattr(self, 'icon_label'):
+        if hasattr(self, "icon_label"):
             self.icon_label.show()
-        if hasattr(self, 'header_layout_widget'):
+        if hasattr(self, "header_layout_widget"):
             self.header_layout_widget.show()
-        if hasattr(self, 'status_label'):
+        if hasattr(self, "status_label"):
             self.status_label.show()
-        if hasattr(self, 'info_label'):
+        if hasattr(self, "info_label"):
             self.info_label.show()
-        if hasattr(self, 'free_space_label'):
+        if hasattr(self, "free_space_label"):
             self.free_space_label.show()
-        if hasattr(self, 'settings_button'):
+        if hasattr(self, "settings_button"):
             self.settings_button.show()
-        if hasattr(self, 'update_spacer'):
+        if hasattr(self, "update_spacer"):
             self.update_spacer.show()
-        if hasattr(self, 'remote_name_label'):
+        if hasattr(self, "remote_name_label"):
             self.remote_name_label.show()
-        if hasattr(self, 'update_indicator') and self.is_updating:
+        if hasattr(self, "update_indicator") and self.is_updating:
             self.update_indicator.show()
-        if hasattr(self, 'name_container'):
+        if hasattr(self, "name_container"):
             self.name_container.show()
         # Restore original stylesheet
         self.setStyleSheet(self._original_stylesheet)
-        
+
         # Restore the dragged card's original content if it was showing preview
         if self._dragged_remote_name:
             dragged_remote = self._dragged_remote_name
@@ -1245,31 +1270,31 @@ class DriveCard(QFrame):
         self.setMinimumHeight(0)
         self.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX equivalent
         self._drag_over_height = None
-        
+
         # Restore original appearance - show all content and restore stylesheet
-        if hasattr(self, 'icon_label'):
+        if hasattr(self, "icon_label"):
             self.icon_label.show()
-        if hasattr(self, 'header_layout_widget'):
+        if hasattr(self, "header_layout_widget"):
             self.header_layout_widget.show()
-        if hasattr(self, 'status_label'):
+        if hasattr(self, "status_label"):
             self.status_label.show()
-        if hasattr(self, 'info_label'):
+        if hasattr(self, "info_label"):
             self.info_label.show()
-        if hasattr(self, 'free_space_label'):
+        if hasattr(self, "free_space_label"):
             self.free_space_label.show()
-        if hasattr(self, 'settings_button'):
+        if hasattr(self, "settings_button"):
             self.settings_button.show()
-        if hasattr(self, 'update_spacer'):
+        if hasattr(self, "update_spacer"):
             self.update_spacer.show()
-        if hasattr(self, 'remote_name_label'):
+        if hasattr(self, "remote_name_label"):
             self.remote_name_label.show()
-        if hasattr(self, 'update_indicator') and self.is_updating:
+        if hasattr(self, "update_indicator") and self.is_updating:
             self.update_indicator.show()
-        if hasattr(self, 'name_container'):
+        if hasattr(self, "name_container"):
             self.name_container.show()
         # Restore original stylesheet (remove grey background)
         self.setStyleSheet(self._original_stylesheet)
-        
+
         # Restore the dragged card's original content and stylesheet (drop completed, so restore preview)
         if dragged_remote:
             parent = self.parent()
@@ -1288,6 +1313,6 @@ class DriveCard(QFrame):
                         dragged_card.style().polish(dragged_card)
                     break
                 parent = parent.parent()
-        
+
         # Clear the stored dragged remote name
         self._dragged_remote_name = None

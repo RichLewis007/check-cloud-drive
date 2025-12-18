@@ -1,10 +1,5 @@
 """Tests for ConfigManager."""
 
-import tempfile
-from pathlib import Path
-
-import pytest
-
 from check_cloud_drives.config import ConfigManager
 from check_cloud_drives.models import DriveConfig
 
@@ -182,4 +177,3 @@ auto_refresh_interval = 600
         assert manager2.get_drives()[0].remote_name == "persistent_remote"
         assert manager2.get_stay_on_top() is True
         assert manager2.get_drive_order() == ["persistent_remote"]
-

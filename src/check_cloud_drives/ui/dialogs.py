@@ -90,10 +90,10 @@ class SetupDialog(QDialog):
 
         self.remotes_list = QListWidget()
         app_font = QFont("AtkynsonMono Nerd Font Propo", 13)
-        
+
         # Create a dict for quick lookup of existing drives
         existing_dict = {d.remote_name: d for d in self.existing_drives}
-        
+
         # First, add existing drives in their saved order
         for remote_name in self.drive_order:
             if remote_name in existing_dict:
@@ -101,7 +101,7 @@ class SetupDialog(QDialog):
                 item.setFont(app_font)
                 item.setCheckState(Qt.Checked)  # Existing drives are checked
                 self.remotes_list.addItem(item)
-        
+
         # Then add any other existing drives not in the order
         for drive in self.existing_drives:
             if drive.remote_name not in self.drive_order:
@@ -109,7 +109,7 @@ class SetupDialog(QDialog):
                 item.setFont(app_font)
                 item.setCheckState(Qt.Checked)  # Existing drives are checked
                 self.remotes_list.addItem(item)
-        
+
         # Finally, add new remotes that aren't already added
         for remote in self.available_remotes:
             if remote not in self.existing_remotes:
@@ -117,9 +117,9 @@ class SetupDialog(QDialog):
                 item.setFont(app_font)
                 item.setCheckState(Qt.Unchecked)  # New remotes start unchecked
                 self.remotes_list.addItem(item)
-        
+
         layout.addWidget(self.remotes_list)
-        
+
         # Set minimum height for the list widget to make it taller
         self.remotes_list.setMinimumHeight(300)
 
@@ -133,7 +133,7 @@ class SetupDialog(QDialog):
                 padding: 6px 12px;
             }
         """
-        
+
         # Create a reference button to get standard height
         ref_button = QPushButton("Cancel")
         ref_button.setStyleSheet(standard_button_style)
@@ -148,7 +148,9 @@ class SetupDialog(QDialog):
         manual_layout.addWidget(self.manual_remote)
         add_btn = QPushButton("Add")
         add_btn.setFixedHeight(standard_button_height)
-        add_btn.setStyleSheet(standard_button_style + """
+        add_btn.setStyleSheet(
+            standard_button_style
+            + """
             QPushButton {
                 color: #ffffff;
                 background-color: #3498db;
@@ -160,7 +162,8 @@ class SetupDialog(QDialog):
             QPushButton:pressed {
                 background-color: #21618c;
             }
-        """)
+        """
+        )
         add_btn.clicked.connect(self._add_manual)
         manual_layout.addWidget(add_btn)
         layout.addLayout(manual_layout)
@@ -169,14 +172,16 @@ class SetupDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
-        
+
         # Style both buttons with consistent font and get standard height
         ok_button = buttons.button(QDialogButtonBox.Ok)
         cancel_button = buttons.button(QDialogButtonBox.Cancel)
-        
+
         if cancel_button:
             # Style Cancel button with standard font
-            cancel_button.setStyleSheet(standard_button_style + """
+            cancel_button.setStyleSheet(
+                standard_button_style
+                + """
                 QPushButton {
                     color: #2c3e50;
                     background-color: #ecf0f1;
@@ -188,12 +193,15 @@ class SetupDialog(QDialog):
                 QPushButton:pressed {
                     background-color: #bfc9ca;
                 }
-            """)
-        
+            """
+            )
+
         if ok_button:
             # Match Cancel button height and style OK button green
             ok_button.setFixedHeight(standard_button_height)
-            ok_button.setStyleSheet(standard_button_style + """
+            ok_button.setStyleSheet(
+                standard_button_style
+                + """
                 QPushButton {
                     color: #ffffff;
                     background-color: #27ae60;
@@ -205,8 +213,9 @@ class SetupDialog(QDialog):
                 QPushButton:pressed {
                     background-color: #1e8449;
                 }
-            """)
-        
+            """
+            )
+
         layout.addWidget(buttons)
 
     def _show_centered_message(self, title: str, message: str, icon=QMessageBox.Warning):
@@ -216,20 +225,20 @@ class SetupDialog(QDialog):
         msg_box.setText(message)
         msg_box.setIcon(icon)
         msg_box.setStandardButtons(QMessageBox.Ok)
-        
+
         # Center over parent dialog
         dialog_geometry = self.geometry()
         msg_box.adjustSize()
         msg_box.move(
             dialog_geometry.center().x() - msg_box.width() // 2,
-            dialog_geometry.center().y() - msg_box.height() // 2
+            dialog_geometry.center().y() - msg_box.height() // 2,
         )
-        
+
         msg_box.exec()
 
     def _normalize_remote_name(self, remote_name: str) -> str:
         """Normalize remote name by removing trailing colon if present.
-        
+
         Rclone remote names can be entered with or without a trailing colon.
         This function ensures consistent storage without the colon.
         """
@@ -253,19 +262,19 @@ class SetupDialog(QDialog):
                     item.setCheckState(Qt.Checked)
                     self.manual_remote.clear()
                     return
-            
+
             # Validate remote by running rclone about command
             # Ensure remote name ends with colon for rclone command
             remote_with_colon = remote_name if remote_name.endswith(":") else remote_name + ":"
-            
+
             try:
                 result = subprocess.run(
                     ["rclone", "about", remote_with_colon],
                     capture_output=True,
                     text=True,
-                    timeout=10
+                    timeout=10,
                 )
-                
+
                 if result.returncode != 0:
                     # Remote is not set up in rclone
                     self._show_centered_message(
@@ -274,7 +283,7 @@ class SetupDialog(QDialog):
                         f"Please configure this remote using 'rclone config' before adding it.",
                     )
                     return  # Don't add the remote, return to dialog
-                
+
             except subprocess.TimeoutExpired:
                 self._show_centered_message(
                     "Validation Timeout",
@@ -295,7 +304,7 @@ class SetupDialog(QDialog):
                     f"Error validating remote '{remote_name}': {str(e)}",
                 )
                 return
-            
+
             # Validation passed - add new item with normalized name
             item = QListWidgetItem(remote_name)
             app_font = QFont("AtkynsonMono Nerd Font Propo", 13)
@@ -310,12 +319,12 @@ class SetupDialog(QDialog):
         """Collect selected drives and accept."""
         # Create dict of existing drives for lookup
         existing_dict = {d.remote_name: d for d in self.existing_drives}
-        
+
         for i in range(self.remotes_list.count()):
             item = self.remotes_list.item(i)
             # Normalize remote name to ensure consistency (remove trailing colon if present)
             remote_name = self._normalize_remote_name(item.text())
-            
+
             if item.checkState() == Qt.Checked:
                 # Drive is checked - add to selected
                 if remote_name in existing_dict:
@@ -327,14 +336,16 @@ class SetupDialog(QDialog):
                     drive_type = self._guess_drive_type(remote_name)
                     self.selected_drives.append(
                         DriveConfig(
-                            remote_name=remote_name, display_name=display_name, drive_type=drive_type
+                            remote_name=remote_name,
+                            display_name=display_name,
+                            drive_type=drive_type,
                         )
                     )
             else:
                 # Drive is unchecked - mark for removal if it was previously added
                 if remote_name in self.existing_remotes:
                     self.removed_drives.append(remote_name)
-        
+
         super().accept()
 
     def _guess_display_name(self, remote_name: str) -> str:
@@ -358,4 +369,3 @@ class SetupDialog(QDialog):
             return "protondrive"
         else:
             return "unknown"
-

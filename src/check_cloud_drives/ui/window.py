@@ -579,7 +579,7 @@ class MainWindow(QMainWindow):
             # Get list of selected remote names
             selected_remote_names = {d.remote_name for d in dialog.selected_drives}
             existing_remote_names = set(self.drive_cards.keys())
-            
+
             # Remove drives that are not in the selected list (unchecked)
             for remote_name in list(self.drive_cards.keys()):
                 if remote_name not in selected_remote_names:
@@ -589,30 +589,27 @@ class MainWindow(QMainWindow):
                     card.deleteLater()
                     # Remove from dict
                     del self.drive_cards[remote_name]
-            
-            # Create a dict of selected drives for lookup
-            selected_drives_dict = {d.remote_name: d for d in dialog.selected_drives}
-            
+
             # Separate existing drives from new drives
             existing_drives = []
             new_drives = []
-            
+
             for drive_config in dialog.selected_drives:
                 if drive_config.remote_name in existing_remote_names:
                     existing_drives.append(drive_config)
                 else:
                     new_drives.append(drive_config)
-            
+
             # Update existing cards (they stay in their current positions)
             for drive_config in existing_drives:
                 if drive_config.remote_name in self.drive_cards:
                     # Update card config if needed
                     self.drive_cards[drive_config.remote_name].drive_config = drive_config
-            
+
             # Add new drives at the bottom (before the stretch)
             for drive_config in new_drives:
                 self._add_drive_card(drive_config)
-            
+
             # Save the updated drive list (only selected drives) and order
             self.config_manager.set_drives(dialog.selected_drives)
             self._save_drive_order()
@@ -626,7 +623,9 @@ class MainWindow(QMainWindow):
         card = DriveCard(drive_config, self.cards_container)
         card.setAcceptDrops(True)
         # Connect signal to save display name changes to config
-        card.display_name_saved.connect(lambda name, remote=drive_config.remote_name: self._save_card_display_name(remote, name))
+        card.display_name_saved.connect(
+            lambda name, remote=drive_config.remote_name: self._save_card_display_name(remote, name)
+        )
         # Connect signal to remove card
         card.card_removed.connect(lambda remote=drive_config.remote_name: self._remove_card(remote))
         self.drive_cards[drive_config.remote_name] = card
@@ -645,30 +644,30 @@ class MainWindow(QMainWindow):
                 break
         self.config_manager.set_drives(drives)
         self.config_manager.save_config()
-    
+
     def _remove_card(self, remote_name: str):
         """Remove a card from the UI and config."""
         if remote_name not in self.drive_cards:
             return
-        
+
         card = self.drive_cards[remote_name]
-        
+
         # Remove card from layout
         self.cards_layout.removeWidget(card)
         card.deleteLater()
-        
+
         # Remove from dict
         del self.drive_cards[remote_name]
-        
+
         # Update config - remove the drive from the list
         drives = self.config_manager.get_drives()
         drives = [d for d in drives if d.remote_name != remote_name]
         self.config_manager.set_drives(drives)
         self.config_manager.save_config()
-        
+
         # Update drive order
         self._save_drive_order()
-    
+
     def _save_drives(self):
         """Save current drives to config."""
         drives = []
@@ -684,10 +683,10 @@ class MainWindow(QMainWindow):
 
     def reorder_cards(self, dragged_remote: str, target_remote: str):
         """Reorder cards when one is dragged onto another.
-        
+
         Simple swap behavior: the dragged card and target card swap positions.
         All other cards remain in their exact same positions.
-        
+
         QVBoxLayout has no automatic ordering - it displays widgets in layout order.
         We manually reorder by swapping the two cards' positions.
         """
@@ -792,23 +791,23 @@ class MainWindow(QMainWindow):
         """Stop all running workers and wait for them to finish."""
         if not self.workers:
             return
-        
+
         # Wait briefly for workers to finish, then terminate if still running
         # This allows quick exit while ensuring threads are cleaned up
-        import time
+
         wait_timeout_ms = 2000  # Wait up to 2 seconds for normal completion
         terminate_timeout_ms = 1000  # Wait 1 second after terminate
-        
+
         for worker in self.workers[:]:  # Copy list to avoid modification during iteration
             if worker.isRunning():
                 # Wait briefly for the worker to finish normally
                 worker.wait(wait_timeout_ms)
-                
+
                 # If still running, terminate it
                 if worker.isRunning():
                     worker.terminate()
                     worker.wait(terminate_timeout_ms)
-        
+
         # Clean up all workers
         for worker in self.workers[:]:
             if worker.isRunning():
@@ -1266,7 +1265,7 @@ class MainWindow(QMainWindow):
 
     def _show_overlay(self):
         """Show the dimming overlay over the main window."""
-        if hasattr(self, 'overlay'):
+        if hasattr(self, "overlay"):
             central = self.centralWidget()
             if central:
                 # Position overlay to cover entire central widget
@@ -1276,13 +1275,13 @@ class MainWindow(QMainWindow):
 
     def _hide_overlay(self):
         """Hide the dimming overlay."""
-        if hasattr(self, 'overlay'):
+        if hasattr(self, "overlay"):
             self.overlay.hide()
 
     def resizeEvent(self, event):
         """Handle window resize to update overlay size."""
         super().resizeEvent(event)
-        if hasattr(self, 'overlay') and self.overlay.isVisible():
+        if hasattr(self, "overlay") and self.overlay.isVisible():
             central = self.centralWidget()
             if central:
                 self.overlay.setGeometry(central.geometry())
@@ -1312,13 +1311,13 @@ class MainWindow(QMainWindow):
         self.config_manager.set_window_geometry(
             {"x": geo.x(), "y": geo.y(), "width": geo.width(), "height": geo.height()}
         )
-        
+
         # Save drive order before closing/hiding
         self._save_drive_order()
-        
+
         # Stop all running worker threads before closing
         self._stop_all_workers()
-        
+
         # Stop refresh timer
         if self.refresh_timer.isActive():
             self.refresh_timer.stop()

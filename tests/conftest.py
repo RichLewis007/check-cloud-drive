@@ -46,4 +46,3 @@ def sample_drive_status():
         last_updated="2024-01-15 14:30:00",
         error=None,
     )
-
